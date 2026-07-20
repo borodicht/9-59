@@ -13,6 +13,7 @@ const readerMetaElement = document.querySelector("[data-reader-meta]");
 const readerPrevButton = document.querySelector("[data-reader-prev]");
 const readerNextButton = document.querySelector("[data-reader-next]");
 const readerCloseElements = document.querySelectorAll("[data-close-reader]");
+const revealElements = document.querySelectorAll("[data-reveal]");
 const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 
 const TIMER_DURATION_MS = (9 * 60 + 59) * 1000;
@@ -112,12 +113,48 @@ if (readerNextButton) {
   });
 }
 
+initializeRevealAnimations();
+
 function formatTime(totalSeconds) {
   const safeSeconds = Math.max(0, totalSeconds);
   const minutes = Math.floor(safeSeconds / 60);
   const seconds = safeSeconds % 60;
 
   return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
+function initializeRevealAnimations() {
+  if (!revealElements.length) {
+    return;
+  }
+
+  if (prefersReducedMotion.matches || !("IntersectionObserver" in window)) {
+    revealElements.forEach((element) => {
+      element.classList.add("is-visible");
+    });
+    return;
+  }
+
+  const observer = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) {
+          return;
+        }
+
+        entry.target.classList.add("is-visible");
+        observer.unobserve(entry.target);
+      });
+    },
+    {
+      threshold: 0.2,
+      rootMargin: "0px 0px -40px 0px"
+    }
+  );
+
+  revealElements.forEach((element) => {
+    observer.observe(element);
+  });
 }
 
 async function loadReaderContent() {

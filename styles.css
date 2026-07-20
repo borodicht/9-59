@@ -870,6 +870,130 @@ body {
   text-transform: uppercase;
 }
 
+.author-section {
+  position: relative;
+  background:
+    radial-gradient(circle at 24% 42%, rgba(183, 146, 98, 0.08), rgba(183, 146, 98, 0) 26%),
+    radial-gradient(circle at 84% 28%, rgba(183, 146, 98, 0.05), rgba(183, 146, 98, 0) 24%),
+    linear-gradient(180deg, rgba(8, 8, 8, 0.98), rgba(6, 6, 6, 1));
+}
+
+.author-section__inner {
+  display: grid;
+  grid-template-columns: minmax(20rem, 38%) minmax(0, 1fr);
+  gap: clamp(2rem, 4vw, 4rem);
+  align-items: center;
+  max-width: var(--content-max-width);
+  margin: 0 auto;
+  padding: clamp(3rem, 6vw, 5rem) var(--panel-side-padding);
+}
+
+.author-section__media,
+.author-section__content > [data-reveal] {
+  opacity: 0;
+  transform: translateY(1.2rem);
+  transition:
+    opacity 680ms ease,
+    transform 680ms ease;
+}
+
+.author-section__media.is-visible,
+.author-section__content > [data-reveal].is-visible,
+.author-section__bio.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.author-section__media {
+  transition-delay: 0ms;
+}
+
+.author-section__kicker {
+  margin: 0 0 0.9rem;
+  color: var(--color-gold);
+  font-family: "Forum", serif;
+  font-size: clamp(1.1rem, 1.3vw, 1.28rem);
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  transition-delay: 120ms;
+}
+
+.author-section__name {
+  margin: 0;
+  color: var(--color-text);
+  font-family: "Forum", serif;
+  font-size: clamp(2.3rem, 3.4vw, 3.5rem);
+  font-weight: 400;
+  letter-spacing: 0.06em;
+  line-height: 1;
+  transition-delay: 220ms;
+}
+
+.author-section__bio {
+  margin-top: 1.4rem;
+  color: #c4b8a6;
+  font-size: clamp(1rem, 1.1vw, 1.14rem);
+  line-height: 1.78;
+  max-width: 68ch;
+  transition-delay: 320ms;
+}
+
+.author-section__bio p {
+  margin: 0 0 1rem;
+}
+
+.author-section__bio p:last-child {
+  margin-bottom: 0;
+}
+
+.author-section__bio strong {
+  color: #ded0bd;
+  font-weight: 600;
+}
+
+.author-section__portrait {
+  position: relative;
+  margin: 0;
+  border-radius: 1rem;
+  overflow: hidden;
+  box-shadow:
+    0 1.6rem 3rem rgba(0, 0, 0, 0.28),
+    0 0.6rem 1.2rem rgba(0, 0, 0, 0.16);
+}
+
+.author-section__portrait::before,
+.author-section__portrait::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.author-section__portrait::before {
+  background:
+    linear-gradient(180deg, rgba(8, 8, 8, 0.08), rgba(8, 8, 8, 0.24)),
+    radial-gradient(circle at 50% 40%, rgba(0, 0, 0, 0) 48%, rgba(0, 0, 0, 0.18) 100%);
+}
+
+.author-section__portrait::after {
+  background:
+    linear-gradient(90deg, rgba(205, 175, 119, 0.08), rgba(205, 175, 119, 0) 24%),
+    radial-gradient(circle at 82% 18%, rgba(255, 240, 212, 0.1), rgba(255, 240, 212, 0) 22%);
+  mix-blend-mode: screen;
+}
+
+.author-section__portrait img {
+  display: block;
+  width: 100%;
+  height: auto;
+  object-fit: cover;
+  filter: saturate(0.92) contrast(1.02) brightness(0.88);
+}
+
+.author-section__socials[hidden] {
+  display: none;
+}
+
 @media (min-width: 1600px) {
   :root {
     --hero-bg-position: center 44%;
@@ -941,6 +1065,11 @@ body {
   .reader-dialog {
     width: min(86vw, 56rem);
     height: min(90vh, 54rem);
+  }
+
+  .author-section__inner {
+    grid-template-columns: minmax(16rem, 34%) minmax(0, 1fr);
+    gap: 2rem;
   }
 }
 
@@ -1058,6 +1187,26 @@ body {
   .reader-dialog__nav--prev,
   .reader-dialog__nav--next {
     justify-self: center;
+  }
+
+  .author-section__inner {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+    padding: 2.4rem 1rem 2.6rem;
+  }
+
+  .author-section__media {
+    width: min(32rem, 100%);
+    margin-inline: auto;
+  }
+
+  .author-section__content {
+    width: min(40rem, 100%);
+    text-align: center;
+  }
+
+  .author-section__bio {
+    margin-inline: auto;
   }
 }
 
@@ -1202,6 +1351,19 @@ body {
   .reader-dialog__meta {
     font-size: 0.86rem;
   }
+
+  .author-section__inner {
+    padding: 2rem 0.9rem 2.2rem;
+  }
+
+  .author-section__name {
+    font-size: 2rem;
+  }
+
+  .author-section__bio {
+    font-size: 0.98rem;
+    line-height: 1.72;
+  }
 }
 
 @media (max-width: 390px) {
@@ -1276,5 +1438,9 @@ body {
   .reader-dialog__page {
     font-size: 0.92rem;
     line-height: 1.62;
+  }
+
+  .author-section__portrait {
+    border-radius: 0.9rem;
   }
 }
