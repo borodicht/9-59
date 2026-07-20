@@ -1,0 +1,20 @@
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+node_modules/
+dist/
+build/
+.env
+.env.*
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Local/generated preview artifacts not used by the published site
+assets/images/extended-preview-frames/
+assets/images/transition-preview-frames/
+assets/images/*preview*.mp4
+assets/images/site-preview-current.png
+assets/images/hero-screen-composed.png

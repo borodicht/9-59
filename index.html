@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Лендинг книги «Мечта. 9:59» с атмосферным первым экраном."
+    />
+    <title>Мечта. 9:59</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Forum&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header
+      class="hero"
+      id="hero"
+      aria-labelledby="hero-title hero-timer hero-tagline"
+    >
+      <button
+        class="hero__atmosphere-button"
+        type="button"
+        aria-label="Включить или выключить музыкальный трек книги"
+        aria-pressed="false"
+      >
+        Включить трек
+      </button>
+
+      <div class="hero__scene" aria-hidden="true"></div>
+      <div class="hero__fire" aria-hidden="true">
+        <div class="hero__fire-glow"></div>
+        <div class="hero__fire-flame hero__fire-flame--back"></div>
+        <div class="hero__fire-flame hero__fire-flame--front"></div>
+        <div class="hero__fire-flame hero__fire-flame--core"></div>
+      </div>
+      <div class="hero__spark" aria-hidden="true"></div>
+      <div class="hero__dog-head" aria-hidden="true"></div>
+      <div class="hero__overlay" aria-hidden="true"></div>
+
+      <div class="hero__countdown">
+        <p class="hero__countdown-label" id="hero-title">МЕЧТА</p>
+        <h1
+          class="hero__timer"
+          id="hero-timer"
+          role="timer"
+          aria-label="Обратный таймер"
+        >
+          09:59
+        </h1>
+        <p class="hero__tagline hero__tagline--countdown" id="hero-tagline">
+          СВОБОДА ЧЕРЕЗ ПРИНЯТИЕ
+        </p>
+      </div>
+    </header>
+
+    <main>
+      <section
+        class="about-panel"
+        id="fragment"
+        aria-labelledby="about-title downloads-title"
+      >
+        <div class="about-panel__inner">
+          <div class="about-panel__book book-mockup">
+            <img
+              src="assets/images/book-mockup.webp"
+              alt="Книга «Мечта. 9:59» Тимофея Бородича"
+              width="660"
+              height="930"
+              loading="lazy"
+              decoding="async"
+            />
+          </div>
+
+          <section class="about-panel__copy" aria-labelledby="about-title">
+            <h2 class="about-panel__kicker" id="about-title">О КНИГЕ</h2>
+            <p class="about-panel__text">
+              Иногда, чтобы найти свободу, нужно перестать бороться. Принять.
+              Отпустить. Позволить. И тогда дверь откроется.
+            </p>
+            <p class="about-panel__text about-panel__text--muted">
+              «Мечта. 9:59» — это путь внутрь себя. Туда, где заканчивается
+              страх и начинается свобода.
+            </p>
+            <a class="about-panel__link" href="#fragment">Читать фрагмент</a>
+          </section>
+
+          <section
+            class="about-panel__downloads"
+            id="downloads"
+            aria-labelledby="downloads-title"
+          >
+            <h2 class="about-panel__kicker" id="downloads-title">
+              СКАЧАТЬ КНИГУ
+            </h2>
+            <div class="about-panel__format-grid">
+              <a
+                class="about-panel__format-card"
+                href="assets/books/book.pdf"
+                download
+              >
+                <span class="about-panel__format-icon">PDF</span>
+                <span class="about-panel__format-meta">
+                  <span class="about-panel__format-name">PDF</span>
+                  <span class="about-panel__format-action">Скачать</span>
+                </span>
+              </a>
+              <a
+                class="about-panel__format-card"
+                href="assets/books/book.epub"
+                download
+              >
+                <span class="about-panel__format-icon">EP</span>
+                <span class="about-panel__format-meta">
+                  <span class="about-panel__format-name">EPUB</span>
+                  <span class="about-panel__format-action">Скачать</span>
+                </span>
+              </a>
+              <a
+                class="about-panel__format-card"
+                href="assets/books/book.fb2"
+                download
+              >
+                <span class="about-panel__format-icon">FB</span>
+                <span class="about-panel__format-meta">
+                  <span class="about-panel__format-name">FB2</span>
+                  <span class="about-panel__format-action">Скачать</span>
+                </span>
+              </a>
+            </div>
+            <p
+              class="about-panel__text about-panel__text--muted about-panel__text--narrow"
+            >
+              Выберите удобный формат и скачайте книгу бесплатно.
+            </p>
+          </section>
+        </div>
+      </section>
+    </main>
+
+    <script src="script.js"></script>
+  </body>
+</html>
