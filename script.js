@@ -124,12 +124,14 @@ function formatTime(totalSeconds) {
 }
 
 function initializeRevealAnimations() {
-  if (!revealElements.length) {
+  const animatedElements = [...revealElements];
+
+  if (!animatedElements.length) {
     return;
   }
 
   if (prefersReducedMotion.matches || !("IntersectionObserver" in window)) {
-    revealElements.forEach((element) => {
+    animatedElements.forEach((element) => {
       element.classList.add("is-visible");
     });
     return;
@@ -152,7 +154,7 @@ function initializeRevealAnimations() {
     }
   );
 
-  revealElements.forEach((element) => {
+  animatedElements.forEach((element) => {
     observer.observe(element);
   });
 }
