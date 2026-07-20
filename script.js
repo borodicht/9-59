@@ -37,16 +37,26 @@ const READER_FOCUSABLE_SELECTOR = [
   "[tabindex]:not([tabindex='-1'])"
 ].join(", ");
 
-const AUDIO_PATHS = {
-  fireplace: "./assets/audio/ambient/fireplace.mp3",
-  clock: "./assets/audio/ambient/clock.mp3",
-  dogHowl: "./assets/audio/ambient/dog-howl.mp3",
-  bookTrack: "./assets/audio/music/book-track.mp3"
+const AUDIO_SOURCES = {
+  fireplace: {
+    mp3: "./assets/audio/ambient/fireplace.mp3"
+  },
+  clock: {
+    opus: "./assets/audio/ambient/clock.ogg",
+    mp3: "./assets/audio/ambient/clock.mp3"
+  },
+  dogHowl: {
+    mp3: "./assets/audio/ambient/dog-howl.mp3"
+  },
+  bookTrack: {
+    opus: "./assets/audio/music/book-track.ogg",
+    mp3: "./assets/audio/music/book-track.mp3"
+  }
 };
 
 const AUDIO_VOLUME = {
-  fireplace: 0.23,
-  clock: 0.04,
+  fireplace: 0.17,
+  clock: 0.09,
   dogHowl: 1,
   bookTrack: 0.45
 };
@@ -61,12 +71,30 @@ const audioState = {
   ambience: {},
   effects: {},
   music: null,
+  loadRequested: {
+    fireplace: false,
+    clock: false,
+    dogHowl: false,
+    bookTrack: false
+  },
   availability: {
     fireplace: "unknown",
     clock: "unknown",
     dogHowl: "unknown",
     bookTrack: "unknown"
   }
+};
+
+const AUDIO_CAPABILITIES = {
+  opus: (() => {
+    const audio = document.createElement("audio");
+
+    if (typeof audio.canPlayType !== "function") {
+      return false;
+    }
+
+    return audio.canPlayType('audio/ogg; codecs="opus"') !== "";
+  })()
 };
 
 let countdownEndTime = Date.now() + TIMER_DURATION_MS;
@@ -124,14 +152,12 @@ function formatTime(totalSeconds) {
 }
 
 function initializeRevealAnimations() {
-  const animatedElements = [...revealElements];
-
-  if (!animatedElements.length) {
+  if (!revealElements.length) {
     return;
   }
 
   if (prefersReducedMotion.matches || !("IntersectionObserver" in window)) {
-    animatedElements.forEach((element) => {
+    revealElements.forEach((element) => {
       element.classList.add("is-visible");
     });
     return;
@@ -154,7 +180,7 @@ function initializeRevealAnimations() {
     }
   );
 
-  animatedElements.forEach((element) => {
+  revealElements.forEach((element) => {
     observer.observe(element);
   });
 }
@@ -332,16 +358,55 @@ function getRemainingSeconds(endTime) {
   return Math.ceil(remainingMs / 1000);
 }
 
-function createAudioElement(src, volume, options = {}) {
+function resolveAudioSource(key) {
+  const sourceSet = AUDIO_SOURCES[key];
+
+  if (!sourceSet) {
+    return "";
+  }
+
+  if (sourceSet.opus && AUDIO_CAPABILITIES.opus) {
+    return sourceSet.opus;
+  }
+
+  return sourceSet.mp3 ?? "";
+}
+
+function createAudioElement(key, volume, options = {}) {
   const audio = new Audio();
 
-  audio.preload = options.preload ?? "auto";
+  audio.preload = options.preload ?? "none";
   audio.loop = Boolean(options.loop);
   audio.volume = volume;
-  audio.src = src;
   audio.crossOrigin = "anonymous";
+  audio.dataset.audioKey = key;
+
+  if (options.assignSource) {
+    audio.src = resolveAudioSource(key);
+  }
 
   return audio;
+}
+
+function requestAudioLoad(audio, key, preload = "metadata") {
+  if (!audio || audioState.loadRequested[key]) {
+    return;
+  }
+
+  const source = resolveAudioSource(key);
+
+  if (!source) {
+    audioState.availability[key] = "missing";
+    return;
+  }
+
+  if (audio.src !== source) {
+    audio.src = source;
+  }
+
+  audio.preload = preload;
+  audio.load();
+  audioState.loadRequested[key] = true;
 }
 
 function attachAvailabilityTracking(audio, key) {
@@ -401,6 +466,16 @@ function updateTrackButton(isPlaying) {
 
   atmosphereButton.textContent = isPlaying ? "Выключить трек" : "Включить трек";
   atmosphereButton.setAttribute("aria-pressed", String(isPlaying));
+}
+
+function setTrackButtonState(state) {
+  if (!atmosphereButton) {
+    return;
+  }
+
+  atmosphereButton.dataset.trackState = state;
+  atmosphereButton.disabled = state === "loading";
+  atmosphereButton.setAttribute("aria-busy", String(state === "loading"));
 }
 
 function resetDogMinuteEvents() {
@@ -516,23 +591,24 @@ async function initializeAudio() {
   }
 
   audioState.ambience.fireplace = createAudioElement(
-    AUDIO_PATHS.fireplace,
+    "fireplace",
     AUDIO_VOLUME.fireplace,
-    { loop: true }
+    { loop: true, preload: "none", assignSource: true }
   );
   audioState.ambience.clock = createAudioElement(
-    AUDIO_PATHS.clock,
+    "clock",
     AUDIO_VOLUME.clock,
-    { loop: true }
+    { loop: true, preload: "none", assignSource: true }
   );
   audioState.effects.dogHowl = createAudioElement(
-    AUDIO_PATHS.dogHowl,
-    AUDIO_VOLUME.dogHowl
+    "dogHowl",
+    AUDIO_VOLUME.dogHowl,
+    { preload: "metadata", assignSource: true }
   );
   audioState.music = createAudioElement(
-    AUDIO_PATHS.bookTrack,
+    "bookTrack",
     0,
-    { loop: false }
+    { loop: false, preload: "none" }
   );
 
   attachAvailabilityTracking(audioState.ambience.fireplace, "fireplace");
@@ -540,13 +616,11 @@ async function initializeAudio() {
   attachAvailabilityTracking(audioState.effects.dogHowl, "dogHowl");
   attachAvailabilityTracking(audioState.music, "bookTrack");
 
-  audioState.ambience.fireplace.load();
-  audioState.ambience.clock.load();
-  audioState.effects.dogHowl.load();
-  audioState.music.load();
+  requestAudioLoad(audioState.effects.dogHowl, "dogHowl", "metadata");
 
   bindAutoplayRetryHandlers();
   updateTrackButton(false);
+  setTrackButtonState("idle");
   audioState.initialized = true;
 
   return audioState;
@@ -564,6 +638,9 @@ function getPlayableAmbientAudio() {
 }
 
 async function startAmbientAudio() {
+  requestAudioLoad(audioState.ambience.fireplace, "fireplace", "auto");
+  requestAudioLoad(audioState.ambience.clock, "clock", "auto");
+
   const playableAudio = getPlayableAmbientAudio();
 
   if (playableAudio.length === 0) {
@@ -660,27 +737,34 @@ async function toggleBookTrack() {
   await initializeAudio();
 
   if (!audioState.music || audioState.availability.bookTrack === "missing") {
+    setTrackButtonState("error");
     return;
   }
 
   if (audioState.music.paused) {
+    setTrackButtonState("loading");
     await tryStartAmbientAudio();
+    requestAudioLoad(audioState.music, "bookTrack", "auto");
     audioState.music.volume = 0;
 
     try {
       await audioState.music.play();
     } catch {
+      setTrackButtonState("error");
       updateTrackButton(false);
       return;
     }
 
+    setTrackButtonState("playing");
     updateTrackButton(true);
     await fadeAudio(audioState.music, AUDIO_VOLUME.bookTrack, MUSIC_FADE_DURATION_MS);
     return;
   }
 
+  setTrackButtonState("pausing");
   await fadeAudio(audioState.music, 0, MUSIC_FADE_DURATION_MS);
   audioState.music.pause();
+  setTrackButtonState("paused");
   updateTrackButton(false);
 }
 
@@ -724,18 +808,17 @@ async function playDogHowl() {
   const howlAudio = audioState.effects.dogHowl;
 
   if (
-    !audioState.ambientStarted ||
     document.hidden ||
     audioState.isHowlPlaying ||
     !howlAudio ||
-    audioState.availability.dogHowl === "missing" ||
-    !howlAudio.paused
+    audioState.availability.dogHowl === "missing"
   ) {
     return false;
   }
 
   try {
     audioState.isHowlPlaying = true;
+    requestAudioLoad(howlAudio, "dogHowl", "auto");
     howlAudio.currentTime = 0;
     await howlAudio.play();
     howlAudio.onended = () => {
@@ -836,13 +919,13 @@ document.addEventListener("visibilitychange", () => {
 
   if (!audioState.ambientStarted) {
     void tryStartAmbientAudio();
+  } else {
+    void startAmbientAudio();
   }
 
   scheduleNextSparkBurst();
 });
 
 initializeFireAnimation();
-void initializeAudio().then(() => {
-  void tryStartAmbientAudio();
-});
+void initializeAudio();
 startCountdown();
