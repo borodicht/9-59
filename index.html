@@ -33,12 +33,15 @@
 
       <div class="hero__scene" aria-hidden="true"></div>
       <div class="hero__fire" aria-hidden="true">
-        <div class="hero__fire-glow"></div>
-        <div class="hero__fire-flame hero__fire-flame--back"></div>
-        <div class="hero__fire-flame hero__fire-flame--front"></div>
-        <div class="hero__fire-flame hero__fire-flame--core"></div>
+        <div class="hero__firelight"></div>
+        <div class="hero__fireplace-flame-area">
+          <div class="hero__fire-glow"></div>
+          <div class="hero__fire-flame hero__fire-flame--back"></div>
+          <div class="hero__fire-flame hero__fire-flame--front"></div>
+          <div class="hero__fire-flame hero__fire-flame--core"></div>
+          <div class="hero__spark-pool"></div>
+        </div>
       </div>
-      <div class="hero__spark" aria-hidden="true"></div>
       <div class="hero__dog-head" aria-hidden="true"></div>
       <div class="hero__overlay" aria-hidden="true"></div>
 
@@ -86,7 +89,13 @@
               «Мечта. 9:59» — это путь внутрь себя. Туда, где заканчивается
               страх и начинается свобода.
             </p>
-            <a class="about-panel__link" href="#fragment">Читать фрагмент</a>
+            <a
+              class="about-panel__link"
+              href="assets/content/fragment.json"
+              data-open-reader
+            >
+              Читать фрагмент
+            </a>
           </section>
 
           <section
@@ -100,8 +109,9 @@
             <div class="about-panel__format-grid">
               <a
                 class="about-panel__format-card"
-                href="assets/books/book.pdf"
-                download
+                href="assets/books/mechta-9-59.pdf"
+                download="mechta-9-59-timofei-borodich.pdf"
+                aria-label="Скачать книгу «Мечта. 9:59» в формате PDF"
               >
                 <span class="about-panel__format-icon">PDF</span>
                 <span class="about-panel__format-meta">
@@ -111,8 +121,9 @@
               </a>
               <a
                 class="about-panel__format-card"
-                href="assets/books/book.epub"
-                download
+                href="assets/books/mechta-9-59.epub"
+                download="mechta-9-59-timofei-borodich.epub"
+                aria-label="Скачать книгу «Мечта. 9:59» в формате EPUB"
               >
                 <span class="about-panel__format-icon">EP</span>
                 <span class="about-panel__format-meta">
@@ -122,8 +133,9 @@
               </a>
               <a
                 class="about-panel__format-card"
-                href="assets/books/book.fb2"
-                download
+                href="assets/books/mechta-9-59.fb2"
+                download="mechta-9-59-timofei-borodich.fb2"
+                aria-label="Скачать книгу «Мечта. 9:59» в формате FB2"
               >
                 <span class="about-panel__format-icon">FB</span>
                 <span class="about-panel__format-meta">
@@ -141,6 +153,57 @@
         </div>
       </section>
     </main>
+
+    <div class="reader-layer" aria-hidden="true">
+      <div class="reader-layer__backdrop" data-close-reader></div>
+      <section
+        class="reader-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="reader-title"
+        aria-describedby="reader-content"
+        tabindex="-1"
+      >
+        <button
+          class="reader-dialog__close"
+          type="button"
+          aria-label="Закрыть режим чтения"
+          data-close-reader
+        >
+          ×
+        </button>
+
+        <div class="reader-dialog__sheet">
+          <header class="reader-dialog__header">
+            <p class="reader-dialog__label">ФРАГМЕНТ</p>
+            <h2 class="reader-dialog__title" id="reader-title">МЕЧТА. 9:59</h2>
+            <div class="reader-dialog__rule" aria-hidden="true"></div>
+          </header>
+
+          <div class="reader-dialog__body">
+            <article class="reader-dialog__page" id="reader-content"></article>
+          </div>
+
+          <footer class="reader-dialog__footer">
+            <button
+              class="reader-dialog__nav reader-dialog__nav--prev"
+              type="button"
+              data-reader-prev
+            >
+              ← Предыдущая
+            </button>
+            <p class="reader-dialog__meta" data-reader-meta></p>
+            <button
+              class="reader-dialog__nav reader-dialog__nav--next"
+              type="button"
+              data-reader-next
+            >
+              Следующая →
+            </button>
+          </footer>
+        </div>
+      </section>
+    </div>
 
     <script src="script.js"></script>
   </body>

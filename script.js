@@ -4,15 +4,37 @@ const atmosphereButton = document.querySelector(".hero__atmosphere-button");
 const heroElement = document.querySelector(".hero");
 const timerElement = document.querySelector(".hero__timer");
 const dogHeadElement = document.querySelector(".hero__dog-head");
+const sparkPoolElement = document.querySelector(".hero__spark-pool");
+const readerTriggerElement = document.querySelector("[data-open-reader]");
+const readerLayerElement = document.querySelector(".reader-layer");
+const readerDialogElement = document.querySelector(".reader-dialog");
+const readerPageElement = document.querySelector(".reader-dialog__page");
+const readerMetaElement = document.querySelector("[data-reader-meta]");
+const readerPrevButton = document.querySelector("[data-reader-prev]");
+const readerNextButton = document.querySelector("[data-reader-next]");
+const readerCloseElements = document.querySelectorAll("[data-close-reader]");
+const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 
 const TIMER_DURATION_MS = (9 * 60 + 59) * 1000;
 const TIMER_TICK_MS = 250;
 const MUSIC_FADE_DURATION_MS = 800;
-const DOG_HEAD_RISE_MS = 2600;
-const DOG_HEAD_HOLD_MS = 1400;
-const DOG_HEAD_LOWER_MS = 3000;
-const DOG_HEAD_ROTATION_DEG = -3.8;
-const DOG_HEAD_LIFT_Y_PX = -6;
+const SPARK_POOL_SIZE = 6;
+const SPARK_BURST_MIN_DELAY_MS = 8000;
+const SPARK_BURST_MAX_DELAY_MS = 20000;
+const SPARK_BURST_MIN_COUNT = 1;
+const SPARK_BURST_MAX_COUNT = 3;
+const SPARK_DURATION_MIN_MS = 1000;
+const SPARK_DURATION_MAX_MS = 2500;
+const DOG_HEAD_ANIMATION_CLASS = "is-howling";
+const DOG_HEAD_ANIMATION_DURATION_MS = 7000;
+const DOG_HEAD_ANIMATION_REDUCED_DURATION_MS = 2200;
+const READER_CONTENT_PATH = "assets/content/fragment.json";
+const READER_CLOSE_DURATION_MS = 320;
+const READER_FOCUSABLE_SELECTOR = [
+  "button:not([disabled])",
+  "a[href]",
+  "[tabindex]:not([tabindex='-1'])"
+].join(", ");
 
 const AUDIO_PATHS = {
   fireplace: "./assets/audio/ambient/fireplace.mp3",
@@ -24,7 +46,7 @@ const AUDIO_PATHS = {
 const AUDIO_VOLUME = {
   fireplace: 0.23,
   clock: 0.04,
-  dogHowl: 0.12,
+  dogHowl: 1,
   bookTrack: 0.45
 };
 
@@ -48,7 +70,14 @@ const audioState = {
 
 let countdownEndTime = Date.now() + TIMER_DURATION_MS;
 let timerIntervalId = null;
-let isDogHeadAnimationRunning = false;
+let sparkTimeoutId = null;
+let sparkElements = [];
+let isDogAnimating = false;
+let isReaderOpen = false;
+let readerContentPromise = null;
+let readerContent = null;
+let currentReaderPageIndex = 0;
+let lastReaderTrigger = null;
 
 const howledMinutes = new Set();
 
@@ -58,12 +87,204 @@ if (atmosphereButton) {
   });
 }
 
+if (readerTriggerElement) {
+  readerTriggerElement.addEventListener("click", (event) => {
+    event.preventDefault();
+    void openReader();
+  });
+}
+
+readerCloseElements.forEach((element) => {
+  element.addEventListener("click", () => {
+    closeReader();
+  });
+});
+
+if (readerPrevButton) {
+  readerPrevButton.addEventListener("click", () => {
+    changeReaderPage(-1);
+  });
+}
+
+if (readerNextButton) {
+  readerNextButton.addEventListener("click", () => {
+    changeReaderPage(1);
+  });
+}
+
 function formatTime(totalSeconds) {
   const safeSeconds = Math.max(0, totalSeconds);
   const minutes = Math.floor(safeSeconds / 60);
   const seconds = safeSeconds % 60;
 
   return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
+async function loadReaderContent() {
+  if (readerContent) {
+    return readerContent;
+  }
+
+  if (!readerContentPromise) {
+    readerContentPromise = fetch(READER_CONTENT_PATH)
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error(`Failed to load fragment content: ${response.status}`);
+        }
+
+        return response.json();
+      })
+      .then((data) => {
+        readerContent = data;
+        return data;
+      });
+  }
+
+  return readerContentPromise;
+}
+
+function renderReaderPage(index) {
+  if (!readerContent || !readerPageElement || !readerMetaElement || !readerPrevButton || !readerNextButton) {
+    return;
+  }
+
+  const page = readerContent.pages[index];
+
+  if (!page) {
+    return;
+  }
+
+  readerPageElement.classList.remove("is-transitioning");
+  void readerPageElement.offsetWidth;
+  readerPageElement.classList.add("is-transitioning");
+  readerPageElement.innerHTML = page.paragraphs
+    .map((paragraph) => `<p>${paragraph}</p>`)
+    .join("");
+  readerPageElement.scrollTop = 0;
+
+  const totalPages = readerContent.pages.length;
+  readerMetaElement.textContent = `${index + 1} / ${totalPages}`;
+  readerPrevButton.hidden = index === 0;
+  readerNextButton.hidden = index === totalPages - 1;
+}
+
+function trapReaderFocus(event) {
+  if (!isReaderOpen || event.key !== "Tab" || !readerDialogElement) {
+    return;
+  }
+
+  const focusableElements = Array.from(
+    readerDialogElement.querySelectorAll(READER_FOCUSABLE_SELECTOR)
+  ).filter((element) => !element.hasAttribute("hidden"));
+
+  if (!focusableElements.length) {
+    return;
+  }
+
+  const firstElement = focusableElements[0];
+  const lastElement = focusableElements[focusableElements.length - 1];
+
+  if (event.shiftKey && document.activeElement === firstElement) {
+    event.preventDefault();
+    lastElement.focus();
+    return;
+  }
+
+  if (!event.shiftKey && document.activeElement === lastElement) {
+    event.preventDefault();
+    firstElement.focus();
+  }
+}
+
+function handleReaderKeydown(event) {
+  if (!isReaderOpen) {
+    return;
+  }
+
+  if (event.key === "Escape") {
+    event.preventDefault();
+    closeReader();
+    return;
+  }
+
+  if (event.key === "ArrowRight" && !readerNextButton?.hidden) {
+    event.preventDefault();
+    changeReaderPage(1);
+    return;
+  }
+
+  if (event.key === "ArrowLeft" && !readerPrevButton?.hidden) {
+    event.preventDefault();
+    changeReaderPage(-1);
+    return;
+  }
+
+  trapReaderFocus(event);
+}
+
+async function openReader() {
+  if (isReaderOpen || !readerLayerElement || !readerDialogElement) {
+    return;
+  }
+
+  lastReaderTrigger = document.activeElement instanceof HTMLElement
+    ? document.activeElement
+    : readerTriggerElement;
+
+  try {
+    await loadReaderContent();
+  } catch {
+    return;
+  }
+
+  currentReaderPageIndex = 0;
+  renderReaderPage(currentReaderPageIndex);
+  isReaderOpen = true;
+  document.body.classList.add("reader-open");
+  readerLayerElement.setAttribute("aria-hidden", "false");
+  readerLayerElement.classList.remove("is-closing");
+  readerLayerElement.classList.add("is-open");
+  document.addEventListener("keydown", handleReaderKeydown);
+
+  window.setTimeout(() => {
+    readerDialogElement.focus();
+  }, 40);
+}
+
+function closeReader() {
+  if (!isReaderOpen || !readerLayerElement) {
+    return;
+  }
+
+  isReaderOpen = false;
+  document.removeEventListener("keydown", handleReaderKeydown);
+  readerLayerElement.classList.add("is-closing");
+  readerLayerElement.classList.remove("is-open");
+
+  window.setTimeout(() => {
+    readerLayerElement.setAttribute("aria-hidden", "true");
+    readerLayerElement.classList.remove("is-closing");
+    document.body.classList.remove("reader-open");
+
+    if (lastReaderTrigger instanceof HTMLElement) {
+      lastReaderTrigger.focus();
+    }
+  }, READER_CLOSE_DURATION_MS);
+}
+
+function changeReaderPage(direction) {
+  if (!readerContent) {
+    return;
+  }
+
+  const nextIndex = currentReaderPageIndex + direction;
+
+  if (nextIndex < 0 || nextIndex >= readerContent.pages.length) {
+    return;
+  }
+
+  currentReaderPageIndex = nextIndex;
+  renderReaderPage(currentReaderPageIndex);
 }
 
 function getRemainingSeconds(endTime) {
@@ -143,7 +364,7 @@ function updateTrackButton(isPlaying) {
   atmosphereButton.setAttribute("aria-pressed", String(isPlaying));
 }
 
-function resetHowledMinutes() {
+function resetDogMinuteEvents() {
   howledMinutes.clear();
 }
 
@@ -154,6 +375,100 @@ function initializeFireAnimation() {
 
   heroElement.dataset.fireAnimationInitialized = "true";
   heroElement.classList.add("hero--fire-active");
+  initializeSparks();
+
+  if (!document.hidden) {
+    scheduleNextSparkBurst();
+  }
+}
+
+function initializeSparks() {
+  if (!sparkPoolElement || sparkPoolElement.dataset.sparkPoolInitialized === "true") {
+    return;
+  }
+
+  sparkPoolElement.dataset.sparkPoolInitialized = "true";
+  sparkElements = Array.from({ length: SPARK_POOL_SIZE }, () => {
+    const spark = document.createElement("span");
+    spark.className = "hero__spark";
+    spark.setAttribute("aria-hidden", "true");
+    spark.addEventListener("animationend", () => {
+      spark.classList.remove("hero__spark--active");
+    });
+    sparkPoolElement.appendChild(spark);
+    return spark;
+  });
+}
+
+function scheduleNextSparkBurst() {
+  if (
+    heroElement?.dataset.fireAnimationInitialized !== "true" ||
+    document.hidden
+  ) {
+    return;
+  }
+
+  cancelScheduledSparks();
+
+  const delay =
+    SPARK_BURST_MIN_DELAY_MS +
+    Math.random() * (SPARK_BURST_MAX_DELAY_MS - SPARK_BURST_MIN_DELAY_MS);
+
+  sparkTimeoutId = window.setTimeout(() => {
+    playSparkBurst();
+    scheduleNextSparkBurst();
+  }, delay);
+}
+
+function playSparkBurst() {
+  if (!sparkElements.length || document.hidden) {
+    return;
+  }
+
+  const availableSparks = sparkElements.filter(
+    (spark) => !spark.classList.contains("hero__spark--active")
+  );
+
+  if (!availableSparks.length) {
+    return;
+  }
+
+  const sparkCount = Math.min(
+    availableSparks.length,
+    SPARK_BURST_MIN_COUNT +
+      Math.floor(Math.random() * (SPARK_BURST_MAX_COUNT - SPARK_BURST_MIN_COUNT + 1))
+  );
+
+  availableSparks
+    .sort(() => Math.random() - 0.5)
+    .slice(0, sparkCount)
+    .forEach((spark) => {
+      const size = 0.2 + Math.random() * 0.18;
+      const left = 34 + Math.random() * 32;
+      const bottom = 10 + Math.random() * 18;
+      const driftX = -0.4 + Math.random() * 0.8;
+      const rise = -(1.1 + Math.random() * 1.4);
+      const duration =
+        SPARK_DURATION_MIN_MS +
+        Math.random() * (SPARK_DURATION_MAX_MS - SPARK_DURATION_MIN_MS);
+
+      spark.classList.remove("hero__spark--active");
+      spark.style.setProperty("--spark-size", `${size}rem`);
+      spark.style.setProperty("--spark-left", `${left}%`);
+      spark.style.setProperty("--spark-bottom", `${bottom}%`);
+      spark.style.setProperty("--spark-drift-x", `${driftX.toFixed(2)}rem`);
+      spark.style.setProperty("--spark-rise", `${rise.toFixed(2)}rem`);
+      spark.style.setProperty("--spark-duration", `${duration.toFixed(0)}ms`);
+      void spark.offsetWidth;
+      spark.classList.add("hero__spark--active");
+    });
+}
+
+function cancelScheduledSparks() {
+  if (sparkTimeoutId !== null) {
+    window.clearTimeout(sparkTimeoutId);
+    sparkTimeoutId = null;
+  }
 }
 
 async function initializeAudio() {
@@ -331,41 +646,39 @@ async function toggleBookTrack() {
 }
 
 function playDogHeadAnimation() {
-  if (!dogHeadElement || isDogHeadAnimationRunning) {
+  if (!dogHeadElement || isDogAnimating) {
     return Promise.resolve();
   }
 
-  isDogHeadAnimationRunning = true;
+  isDogAnimating = true;
+  dogHeadElement.classList.remove(DOG_HEAD_ANIMATION_CLASS);
+  void dogHeadElement.offsetWidth;
+  dogHeadElement.classList.add(DOG_HEAD_ANIMATION_CLASS);
 
-  const animation = dogHeadElement.animate(
-    [
-      { opacity: 0, transform: "rotate(0deg) translate3d(0, 0, 0)" },
-      {
-        opacity: 0.96,
-        transform: `rotate(${DOG_HEAD_ROTATION_DEG}deg) translate3d(0, ${DOG_HEAD_LIFT_Y_PX}px, 0)`,
-        offset: DOG_HEAD_RISE_MS / (DOG_HEAD_RISE_MS + DOG_HEAD_HOLD_MS + DOG_HEAD_LOWER_MS)
-      },
-      {
-        opacity: 0.96,
-        transform: `rotate(${DOG_HEAD_ROTATION_DEG}deg) translate3d(0, ${DOG_HEAD_LIFT_Y_PX}px, 0)`,
-        offset: (DOG_HEAD_RISE_MS + DOG_HEAD_HOLD_MS) / (DOG_HEAD_RISE_MS + DOG_HEAD_HOLD_MS + DOG_HEAD_LOWER_MS)
-      },
-      { opacity: 0, transform: "rotate(0deg) translate3d(0, 0, 0)" }
-    ],
-    {
-      duration: DOG_HEAD_RISE_MS + DOG_HEAD_HOLD_MS + DOG_HEAD_LOWER_MS,
-      easing: "ease-in-out",
-      fill: "none"
-    }
-  );
+  return new Promise((resolve) => {
+    let completed = false;
+    const handleAnimationEnd = () => {
+      if (completed) {
+        return;
+      }
 
-  return animation.finished
-    .catch(() => undefined)
-    .finally(() => {
-      isDogHeadAnimationRunning = false;
-      dogHeadElement.style.opacity = "";
-      dogHeadElement.style.transform = "";
+      completed = true;
+      dogHeadElement.classList.remove(DOG_HEAD_ANIMATION_CLASS);
+      isDogAnimating = false;
+      resolve();
+    };
+
+    dogHeadElement.addEventListener("animationend", handleAnimationEnd, {
+      once: true
     });
+
+    window.setTimeout(
+      handleAnimationEnd,
+      prefersReducedMotion.matches
+        ? DOG_HEAD_ANIMATION_REDUCED_DURATION_MS + 120
+        : DOG_HEAD_ANIMATION_DURATION_MS + 120
+    );
+  });
 }
 
 async function playDogHowl() {
@@ -382,8 +695,6 @@ async function playDogHowl() {
     return false;
   }
 
-  void playDogHeadAnimation();
-
   try {
     audioState.isHowlPlaying = true;
     howlAudio.currentTime = 0;
@@ -399,23 +710,43 @@ async function playDogHowl() {
   }
 }
 
-function checkMinuteHowl(minutes, seconds, options = {}) {
-  const { allowHowl = true } = options;
-
-  if (!allowHowl || document.hidden || seconds !== 0 || minutes < 1 || minutes > 9) {
-    return;
-  }
-
-  if (howledMinutes.has(minutes)) {
-    return;
+async function playDogMinuteEvent(minutes) {
+  if (
+    document.hidden ||
+    minutes < 1 ||
+    minutes > 9 ||
+    howledMinutes.has(minutes) ||
+    isDogAnimating
+  ) {
+    return false;
   }
 
   howledMinutes.add(minutes);
-  void playDogHowl();
+
+  window.setTimeout(() => {
+    void playDogHeadAnimation();
+  }, prefersReducedMotion.matches ? 0 : 180);
+
+  await playDogHowl();
+  return true;
+}
+
+function checkMinuteDogEvent(minutes, seconds, options = {}) {
+  const { allowDogEvent = true } = options;
+
+  if (!allowDogEvent || document.hidden || seconds !== 0 || minutes < 1 || minutes > 9) {
+    return;
+  }
+
+  if (howledMinutes.has(minutes) || audioState.isHowlPlaying || isDogAnimating) {
+    return;
+  }
+
+  void playDogMinuteEvent(minutes);
 }
 
 function updateTimer(options = {}) {
-  const { allowHowl = true } = options;
+  const { allowDogEvent = true } = options;
 
   if (!timerElement) {
     return;
@@ -426,7 +757,7 @@ function updateTimer(options = {}) {
   const seconds = remainingSeconds % 60;
 
   timerElement.textContent = formatTime(remainingSeconds);
-  checkMinuteHowl(minutes, seconds, { allowHowl });
+  checkMinuteDogEvent(minutes, seconds, { allowDogEvent });
 
   if (remainingSeconds === 0 && timerIntervalId !== null) {
     window.clearInterval(timerIntervalId);
@@ -440,16 +771,18 @@ function startCountdown() {
   }
 
   countdownEndTime = Date.now() + TIMER_DURATION_MS;
-  resetHowledMinutes();
+  resetDogMinuteEvents();
   timerElement.textContent = "09:59";
-  updateTimer({ allowHowl: false });
+  updateTimer({ allowDogEvent: false });
   timerIntervalId = window.setInterval(() => {
-    updateTimer({ allowHowl: true });
+    updateTimer({ allowDogEvent: true });
   }, TIMER_TICK_MS);
 }
 
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) {
+    cancelScheduledSparks();
+
     if (audioState.effects.dogHowl && !audioState.effects.dogHowl.paused) {
       audioState.effects.dogHowl.pause();
       audioState.effects.dogHowl.currentTime = 0;
@@ -460,11 +793,13 @@ document.addEventListener("visibilitychange", () => {
     return;
   }
 
-  updateTimer({ allowHowl: false });
+  updateTimer({ allowDogEvent: false });
 
   if (!audioState.ambientStarted) {
     void tryStartAmbientAudio();
   }
+
+  scheduleNextSparkBurst();
 });
 
 initializeFireAnimation();
