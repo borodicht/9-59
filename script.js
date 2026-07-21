@@ -14,6 +14,9 @@ const readerPrevButton = document.querySelector("[data-reader-prev]");
 const readerNextButton = document.querySelector("[data-reader-next]");
 const readerCloseElements = document.querySelectorAll("[data-close-reader]");
 const revealElements = document.querySelectorAll("[data-reveal]");
+const downloadLinkElements = document.querySelectorAll("[data-analytics-event]");
+const authorSectionElement = document.querySelector("#author");
+const authorContactLinkElements = document.querySelectorAll("[data-analytics-contact-type]");
 const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 
 const TIMER_DURATION_MS = (9 * 60 + 59) * 1000;
@@ -42,7 +45,6 @@ const AUDIO_SOURCES = {
     mp3: "./assets/audio/ambient/fireplace.mp3"
   },
   clock: {
-    opus: "./assets/audio/ambient/clock.ogg",
     mp3: "./assets/audio/ambient/clock.mp3"
   },
   dogHowl: {
@@ -55,8 +57,8 @@ const AUDIO_SOURCES = {
 };
 
 const AUDIO_VOLUME = {
-  fireplace: 0.17,
-  clock: 0.09,
+  fireplace: 0.12,
+  clock: 0.16,
   dogHowl: 1,
   bookTrack: 0.45
 };
@@ -109,6 +111,98 @@ let currentReaderPageIndex = 0;
 let lastReaderTrigger = null;
 
 const howledMinutes = new Set();
+const analyticsState = {
+  authorSectionTracked: false,
+  musicPlayingTracked: false,
+  musicPauseTracked: false
+};
+
+function normalizeEventParams(parameters = {}) {
+  return Object.fromEntries(
+    Object.entries(parameters).filter(([, value]) => value !== undefined)
+  );
+}
+
+function trackEvent(eventName, parameters = {}) {
+  if (!eventName) {
+    return;
+  }
+
+  const payload = normalizeEventParams(parameters);
+
+  try {
+    if (typeof window.gtag === "function") {
+      window.gtag("event", eventName, payload);
+      return;
+    }
+
+    if (typeof window.plausible === "function") {
+      window.plausible(eventName, { props: payload });
+      return;
+    }
+
+    if (window.umami?.track) {
+      window.umami.track(eventName, payload);
+      return;
+    }
+
+    if (Array.isArray(window.dataLayer)) {
+      window.dataLayer.push({ event: eventName, ...payload });
+      return;
+    }
+  } catch (error) {
+    console.debug("[analytics:error]", eventName, error);
+    return;
+  }
+
+  console.debug("[analytics]", eventName, payload);
+}
+
+function initializeDownloadAnalytics() {
+  downloadLinkElements.forEach((link) => {
+    link.addEventListener("click", () => {
+      trackEvent(link.dataset.analyticsEvent, {
+        file_type: link.dataset.analyticsFileType
+      });
+    });
+  });
+}
+
+function initializeAuthorAnalytics() {
+  if (authorSectionElement) {
+    if (!("IntersectionObserver" in window)) {
+      analyticsState.authorSectionTracked = true;
+      trackEvent("author_section_view");
+    } else {
+      const observer = new IntersectionObserver(
+        (entries) => {
+          const [entry] = entries;
+
+          if (!entry?.isIntersecting || analyticsState.authorSectionTracked) {
+            return;
+          }
+
+          analyticsState.authorSectionTracked = true;
+          trackEvent("author_section_view");
+          observer.disconnect();
+        },
+        {
+          threshold: 0.35
+        }
+      );
+
+      observer.observe(authorSectionElement);
+    }
+  }
+
+  authorContactLinkElements.forEach((link) => {
+    link.addEventListener("click", () => {
+      trackEvent("author_contact_click", {
+        contact_type: link.dataset.analyticsContactType
+      });
+    });
+  });
+}
 
 if (atmosphereButton) {
   atmosphereButton.addEventListener("click", () => {
@@ -142,6 +236,8 @@ if (readerNextButton) {
 }
 
 initializeRevealAnimations();
+initializeDownloadAnalytics();
+initializeAuthorAnalytics();
 
 function formatTime(totalSeconds) {
   const safeSeconds = Math.max(0, totalSeconds);
@@ -310,6 +406,7 @@ async function openReader() {
   readerLayerElement.classList.remove("is-closing");
   readerLayerElement.classList.add("is-open");
   document.addEventListener("keydown", handleReaderKeydown);
+  trackEvent("fragment_open");
 
   window.setTimeout(() => {
     readerDialogElement.focus();
@@ -322,6 +419,7 @@ function closeReader() {
   }
 
   isReaderOpen = false;
+  trackEvent("fragment_close");
   document.removeEventListener("keydown", handleReaderKeydown);
   readerLayerElement.classList.add("is-closing");
   readerLayerElement.classList.remove("is-open");
@@ -603,7 +701,7 @@ async function initializeAudio() {
   audioState.effects.dogHowl = createAudioElement(
     "dogHowl",
     AUDIO_VOLUME.dogHowl,
-    { preload: "metadata", assignSource: true }
+    { preload: "auto", assignSource: true }
   );
   audioState.music = createAudioElement(
     "bookTrack",
@@ -616,7 +714,7 @@ async function initializeAudio() {
   attachAvailabilityTracking(audioState.effects.dogHowl, "dogHowl");
   attachAvailabilityTracking(audioState.music, "bookTrack");
 
-  requestAudioLoad(audioState.effects.dogHowl, "dogHowl", "metadata");
+  requestAudioLoad(audioState.effects.dogHowl, "dogHowl", "auto");
 
   bindAutoplayRetryHandlers();
   updateTrackButton(false);
@@ -755,6 +853,12 @@ async function toggleBookTrack() {
       return;
     }
 
+    if (!analyticsState.musicPlayingTracked) {
+      trackEvent("music_play");
+    }
+
+    analyticsState.musicPlayingTracked = true;
+    analyticsState.musicPauseTracked = false;
     setTrackButtonState("playing");
     updateTrackButton(true);
     await fadeAudio(audioState.music, AUDIO_VOLUME.bookTrack, MUSIC_FADE_DURATION_MS);
@@ -764,6 +868,13 @@ async function toggleBookTrack() {
   setTrackButtonState("pausing");
   await fadeAudio(audioState.music, 0, MUSIC_FADE_DURATION_MS);
   audioState.music.pause();
+
+  if (!analyticsState.musicPauseTracked) {
+    trackEvent("music_pause");
+  }
+
+  analyticsState.musicPauseTracked = true;
+  analyticsState.musicPlayingTracked = false;
   setTrackButtonState("paused");
   updateTrackButton(false);
 }
@@ -837,20 +948,24 @@ async function playDogMinuteEvent(minutes) {
     document.hidden ||
     minutes < 1 ||
     minutes > 9 ||
-    howledMinutes.has(minutes) ||
-    isDogAnimating
+    howledMinutes.has(minutes)
   ) {
     return false;
   }
 
-  howledMinutes.add(minutes);
+  if (!isDogAnimating) {
+    window.setTimeout(() => {
+      void playDogHeadAnimation();
+    }, prefersReducedMotion.matches ? 0 : 180);
+  }
 
-  window.setTimeout(() => {
-    void playDogHeadAnimation();
-  }, prefersReducedMotion.matches ? 0 : 180);
+  const didPlay = await playDogHowl();
 
-  await playDogHowl();
-  return true;
+  if (didPlay) {
+    howledMinutes.add(minutes);
+  }
+
+  return didPlay;
 }
 
 function checkMinuteDogEvent(minutes, seconds, options = {}) {
@@ -860,7 +975,8 @@ function checkMinuteDogEvent(minutes, seconds, options = {}) {
     return;
   }
 
-  if (howledMinutes.has(minutes) || audioState.isHowlPlaying || isDogAnimating) {
+  // Retry within the same minute boundary if the previous play() call was blocked.
+  if (howledMinutes.has(minutes) || audioState.isHowlPlaying) {
     return;
   }
 
