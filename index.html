@@ -66,6 +66,72 @@
       content="Промо-изображение романа Тимофея Бородича «Мечта. 9:59»"
     />
 
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "Book",
+            "@id": "https://9-59.site/#book",
+            "name": "Мечта. 9:59",
+            "description": "«Мечта. 9:59» — роман Тимофея Бородича о выборе, страхе, любви, свободе и ценности времени.",
+            "inLanguage": "ru",
+            "url": "https://9-59.site/",
+            "image": "https://9-59.site/assets/images/book-cover-current.jpg",
+            "author": {
+              "@id": "https://9-59.site/#author"
+            },
+            "workExample": [
+              {
+                "@id": "https://9-59.site/#book-pdf"
+              },
+              {
+                "@id": "https://9-59.site/#book-epub"
+              },
+              {
+                "@id": "https://9-59.site/#book-fb2"
+              }
+            ]
+          },
+          {
+            "@type": "Person",
+            "@id": "https://9-59.site/#author",
+            "name": "Тимофей Бородич",
+            "url": "https://9-59.site/#author",
+            "image": "https://9-59.site/assets/images/author-timofei-borodich-1080.webp",
+            "description": "Тимофей Бородич — писатель и музыкант, автор романа «Мечта. 9:59»."
+          },
+          {
+            "@type": "Book",
+            "@id": "https://9-59.site/#book-pdf",
+            "name": "Мечта. 9:59 — PDF",
+            "bookFormat": "https://schema.org/EBook",
+            "encodingFormat": "application/pdf",
+            "inLanguage": "ru",
+            "url": "https://9-59.site/assets/books/mechta-9-59.pdf"
+          },
+          {
+            "@type": "Book",
+            "@id": "https://9-59.site/#book-epub",
+            "name": "Мечта. 9:59 — EPUB",
+            "bookFormat": "https://schema.org/EBook",
+            "encodingFormat": "application/epub+zip",
+            "inLanguage": "ru",
+            "url": "https://9-59.site/assets/books/mechta-9-59.epub"
+          },
+          {
+            "@type": "Book",
+            "@id": "https://9-59.site/#book-fb2",
+            "name": "Мечта. 9:59 — FB2",
+            "bookFormat": "https://schema.org/EBook",
+            "encodingFormat": "application/x-fictionbook+xml",
+            "inLanguage": "ru",
+            "url": "https://9-59.site/assets/books/mechta-9-59.fb2"
+          }
+        ]
+      }
+    </script>
+
     <!-- Resource hints -->
     <link
       rel="preload"
@@ -224,7 +290,7 @@
         </div>
       </section>
 
-      <section class="author-section" aria-labelledby="author-title">
+      <section class="author-section" id="author" aria-labelledby="author-title">
         <div class="author-section__inner">
           <div class="author-section__media" data-reveal="photo">
             <figure class="author-section__portrait">
