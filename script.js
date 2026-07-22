@@ -57,7 +57,7 @@ const AUDIO_SOURCES = {
 };
 
 const AUDIO_VOLUME = {
-  fireplace: 0.02,
+  fireplace: 0.005,
   clock: 0.16,
   dogHowl: 1,
   bookTrack: 0.45
