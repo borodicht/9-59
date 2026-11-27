@@ -53,6 +53,7 @@ const readerPrevButton = $("[data-reader-prev]");
 const readerNextButton = $("[data-reader-next]");
 const readerShareButton = $("[data-reader-share]");
 const readerFontButtons = $$("[data-reader-font]");
+const readerThemeButton = $("[data-reader-theme]");
 const readerOriginImage = $("[data-reader-origin]");
 const revealElements = $$("[data-reveal]");
 const authorSectionElement = $("#author");
@@ -285,6 +286,7 @@ const reader = {
   opening: false,
   closeTimeoutId: null,
   lastTrigger: null,
+  night: store.get("localStorage", "reader-theme") === "night",
   fontStep: clampNumber(Number(store.get("localStorage", READER_FONT_KEY)) || 0, READER_FONT_MIN, READER_FONT_MAX),
   selectedQuote: "",
   closingTransition: null
@@ -381,6 +383,7 @@ function renderReaderPage(index, { animate = true } = {}) {
   });
 
   readerPageElement.replaceChildren(...paragraphs);
+  readerPageElement.classList.toggle("is-first-page", index === 0);
 
   if (index === pages.length - 1) {
     readerPageElement.appendChild(buildReaderCta());
@@ -446,6 +449,25 @@ function applyReaderFontStep() {
       (direction < 0 && reader.fontStep <= READER_FONT_MIN) ||
       (direction > 0 && reader.fontStep >= READER_FONT_MAX);
   });
+}
+
+function applyReaderTheme() {
+  readerDialog?.classList.toggle("is-night", reader.night);
+  readerThemeButton?.setAttribute("aria-pressed", String(reader.night));
+  readerThemeButton?.setAttribute("aria-label", reader.night ? "Дневной режим" : "Ночной режим");
+
+  const icon = readerThemeButton?.querySelector("span");
+
+  if (icon) {
+    icon.textContent = reader.night ? "☀" : "☾";
+  }
+}
+
+function toggleReaderTheme() {
+  reader.night = !reader.night;
+  store.set("localStorage", "reader-theme", reader.night ? "night" : "day");
+  trackEvent("reader_theme", { theme: reader.night ? "night" : "day" });
+  applyReaderTheme();
 }
 
 function changeReaderFont(direction) {
@@ -854,8 +876,10 @@ function initializeReader() {
     });
   }
 
+  readerThemeButton?.addEventListener("click", toggleReaderTheme);
   document.addEventListener("selectionchange", handleSelectionChange);
   applyReaderFontStep();
+  applyReaderTheme();
 }
 
 /* ------------------------------------------------------------------ */
@@ -1354,6 +1378,33 @@ function formatTime(totalSeconds) {
   return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 }
 
+const timerDigitElements = timerElement ? $$(".hero__digit", timerElement) : [];
+
+// Каждая цифра — отдельный span фиксированной ширины: таймер не дрожит,
+// а сменившаяся цифра мягко «проявляется».
+function renderTimerDigits(text) {
+  const digits = text.replace(":", "");
+
+  if (timerDigitElements.length !== 4) {
+    timerElement.textContent = text;
+    return;
+  }
+
+  timerDigitElements.forEach((element, index) => {
+    if (element.textContent === digits[index]) {
+      return;
+    }
+
+    element.textContent = digits[index];
+
+    if (!reduceMotion && !document.hidden) {
+      element.classList.remove("is-changing");
+      void element.offsetWidth;
+      element.classList.add("is-changing");
+    }
+  });
+}
+
 function getRemainingSeconds() {
   return Math.ceil(Math.max(0, countdownEndTime - Date.now()) / 1000);
 }
@@ -1416,7 +1467,7 @@ function updateTimer({ allowDogEvent = true } = {}) {
   const minutes = Math.floor(remainingSeconds / 60);
   const seconds = remainingSeconds % 60;
 
-  timerElement.textContent = formatTime(remainingSeconds);
+  renderTimerDigits(formatTime(remainingSeconds));
   checkMinuteDogEvent(minutes, seconds, allowDogEvent);
 
   if (remainingSeconds === 0) {
@@ -1516,6 +1567,124 @@ motionQuery.addEventListener?.("change", (event) => {
 });
 
 /* ------------------------------------------------------------------ */
+/* Эффекты за курсором: глубина сцены, наклон книги, отблеск на карточках */
+/* ------------------------------------------------------------------ */
+
+const finePointer = window.matchMedia("(hover: hover) and (pointer: fine)");
+
+function canUsePointerEffects() {
+  return finePointer.matches && !reduceMotion;
+}
+
+// Обновляем CSS-переменные не чаще одного раза за кадр.
+function rafThrottle(callback) {
+  let frameId = null;
+  let lastEvent = null;
+
+  return (event) => {
+    lastEvent = event;
+
+    if (frameId !== null) {
+      return;
+    }
+
+    frameId = window.requestAnimationFrame(() => {
+      frameId = null;
+      callback(lastEvent);
+    });
+  };
+}
+
+function initializeHeroParallax() {
+  if (!heroElement) {
+    return;
+  }
+
+  heroElement.addEventListener(
+    "pointermove",
+    rafThrottle((event) => {
+      if (!canUsePointerEffects()) {
+        return;
+      }
+
+      const rect = heroElement.getBoundingClientRect();
+      const x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+      const y = ((event.clientY - rect.top) / rect.height) * 2 - 1;
+      heroElement.style.setProperty("--px", x.toFixed(3));
+      heroElement.style.setProperty("--py", y.toFixed(3));
+    })
+  );
+
+  heroElement.addEventListener("pointerleave", () => {
+    heroElement.style.setProperty("--px", "0");
+    heroElement.style.setProperty("--py", "0");
+  });
+}
+
+function initializeBookTilt() {
+  $$("[data-tilt]").forEach((element) => {
+    element.addEventListener(
+      "pointermove",
+      rafThrottle((event) => {
+        if (!canUsePointerEffects()) {
+          return;
+        }
+
+        const rect = element.getBoundingClientRect();
+        const x = (event.clientX - rect.left) / rect.width;
+        const y = (event.clientY - rect.top) / rect.height;
+        element.style.setProperty("--tilt-x", ((0.5 - y) * 10).toFixed(2) + "deg");
+        element.style.setProperty("--tilt-y", ((x - 0.5) * 12).toFixed(2) + "deg");
+        element.style.setProperty("--glare-x", (x * 100).toFixed(1) + "%");
+        element.style.setProperty("--glare-y", (y * 100).toFixed(1) + "%");
+        element.classList.add("is-tilting");
+      })
+    );
+
+    element.addEventListener("pointerleave", () => {
+      element.classList.remove("is-tilting");
+      element.style.setProperty("--tilt-x", "0deg");
+      element.style.setProperty("--tilt-y", "0deg");
+    });
+  });
+}
+
+function initializeCardGlow() {
+  document.addEventListener(
+    "pointermove",
+    rafThrottle((event) => {
+      if (!canUsePointerEffects() || !(event.target instanceof Element)) {
+        return;
+      }
+
+      const card = event.target.closest(".about-panel__format-card");
+
+      if (!card) {
+        return;
+      }
+
+      const rect = card.getBoundingClientRect();
+      card.style.setProperty("--mx", `${event.clientX - rect.left}px`);
+      card.style.setProperty("--my", `${event.clientY - rect.top}px`);
+    }),
+    { passive: true }
+  );
+}
+
+function initializeQuoteBreak() {
+  const quotes = $$(".quote-break__quote");
+
+  if (quotes.length < 2) {
+    return;
+  }
+
+  const chosen = Math.floor(Math.random() * quotes.length);
+  quotes.forEach((quote, index) => {
+    quote.hidden = index !== chosen;
+  });
+}
+
+/* ------------------------------------------------------------------ */
 /* PWA                                                                 */
 /* ------------------------------------------------------------------ */
 
@@ -1545,6 +1714,10 @@ initializeRevealAnimations();
 initializeAuthorAnalytics();
 initializeReader();
 initializeHeroVisibility();
+initializeHeroParallax();
+initializeBookTilt();
+initializeCardGlow();
+initializeQuoteBreak();
 initializeFireAnimation();
 initializeAudio();
 startCountdown();

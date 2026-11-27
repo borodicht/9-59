@@ -2,7 +2,7 @@
 // Даёт офлайн-доступ к странице и фрагменту книги.
 // После изменения списка файлов или стратегии увеличьте VERSION.
 
-const VERSION = "v1";
+const VERSION = "v2";
 const SHELL_CACHE = `mechta-shell-${VERSION}`;
 const RUNTIME_CACHE = `mechta-runtime-${VERSION}`;
 
@@ -15,6 +15,7 @@ const SHELL_URLS = [
   "./assets/content/fragment.json",
   "./assets/images/hero-room-v1.webp",
   "./assets/images/book-mockup.webp",
+  "./assets/images/book-mockup-mask.png",
   "./assets/images/author-timofei-borodich-720.webp",
   "./assets/images/author-timofei-borodich-1080.webp",
   "./assets/images/favicon-32.png",
