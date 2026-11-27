@@ -30,6 +30,13 @@ const store = {
 const motionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
 let reduceMotion = motionQuery.matches;
 
+// Русская типографика: короткие слова не остаются в конце строки, тире не переносится в начало.
+const SHORT_WORDS = /(?<=^|[\s«(\u00A0])(в|и|с|к|о|у|а|я|не|на|по|за|из|от|до|но|ни|во|со|ко|об|обо|без|для|при|под|над|про|что|как) /giu;
+
+function typograph(text) {
+  return text.replace(SHORT_WORDS, "$1\u00A0").replace(/ (—|–)/g, "\u00A0$1");
+}
+
 function wait(ms) {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
@@ -364,7 +371,7 @@ function buildReaderCta() {
   return cta;
 }
 
-function renderReaderPage(index, { animate = true } = {}) {
+function renderReaderPage(index, { animate = true, direction = 1 } = {}) {
   if (!reader.content || !readerPageElement) {
     return;
   }
@@ -378,7 +385,7 @@ function renderReaderPage(index, { animate = true } = {}) {
 
   const paragraphs = page.paragraphs.map((paragraphText) => {
     const paragraph = document.createElement("p");
-    paragraph.textContent = paragraphText;
+    paragraph.textContent = typograph(paragraphText);
     return paragraph;
   });
 
@@ -389,11 +396,12 @@ function renderReaderPage(index, { animate = true } = {}) {
     readerPageElement.appendChild(buildReaderCta());
   }
 
-  readerPageElement.classList.remove("is-transitioning");
+  readerPageElement.classList.remove("is-transitioning", "is-turning-back");
 
   if (animate && !reduceMotion) {
     void readerPageElement.offsetWidth;
     readerPageElement.classList.add("is-transitioning");
+    readerPageElement.classList.toggle("is-turning-back", direction < 0);
   }
 
   readerPageElement.scrollTop = 0;
@@ -437,7 +445,8 @@ function changeReaderPage(direction) {
   }
 
   reader.pageIndex = nextIndex;
-  renderReaderPage(reader.pageIndex);
+  renderReaderPage(reader.pageIndex, { direction });
+  playPageRustle();
 }
 
 function applyReaderFontStep() {
@@ -1713,6 +1722,184 @@ function initializeQuoteBreak() {
 }
 
 /* ------------------------------------------------------------------ */
+/* Шорох страницы: синтезируется на лету, без отдельного файла          */
+/* ------------------------------------------------------------------ */
+
+let audioContext = null;
+
+function playPageRustle() {
+  // Звук только после того, как атмосфера сайта уже зазвучала.
+  if (!audioState.ambientStarted || document.hidden) {
+    return;
+  }
+
+  try {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+
+    if (!AudioContextClass) {
+      return;
+    }
+
+    audioContext ??= new AudioContextClass();
+    const context = audioContext;
+    const duration = 0.42;
+    const buffer = context.createBuffer(1, Math.floor(context.sampleRate * duration), context.sampleRate);
+    const data = buffer.getChannelData(0);
+
+    for (let i = 0; i < data.length; i += 1) {
+      const t = i / data.length;
+      // Шум с «шершавой» огибающей — как бумага, скользящая по бумаге.
+      const grain = Math.random() < 0.08 ? 1.6 : 1;
+      data[i] = (Math.random() * 2 - 1) * grain * Math.sin(Math.PI * Math.min(1, t * 1.6)) * (1 - t);
+    }
+
+    const source = context.createBufferSource();
+    source.buffer = buffer;
+
+    const bandpass = context.createBiquadFilter();
+    bandpass.type = "bandpass";
+    bandpass.frequency.value = 2600;
+    bandpass.Q.value = 0.6;
+
+    const highpass = context.createBiquadFilter();
+    highpass.type = "highpass";
+    highpass.frequency.value = 900;
+
+    const gain = context.createGain();
+    gain.gain.value = 0.09;
+
+    source.connect(bandpass).connect(highpass).connect(gain).connect(context.destination);
+    void context.resume?.();
+    source.start();
+  } catch {
+    /* звук не обязателен */
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Собака: отзывается на прикосновение                                  */
+/* ------------------------------------------------------------------ */
+
+// Положение дога на исходной картинке (доли ширины и высоты 1717×916).
+const DOG_BOX = { left: 0.49, top: 0.63, right: 0.79, bottom: 0.94 };
+// Голова дога и точка поворота (шея) — для анимации воя.
+const DOG_HEAD = { cx: 0.69, cy: 0.71, rx: 0.05, ry: 0.082, pivotX: 0.664, pivotY: 0.808 };
+const HERO_IMAGE_SIZE = { width: 1717, height: 916 };
+
+function positionDogHitArea() {
+  const hit = $("[data-dog-hit]");
+  const scene = $(".hero__scene");
+
+  if (!hit || !scene || !heroElement) {
+    return;
+  }
+
+  const heroWidth = heroElement.clientWidth;
+  const heroHeight = heroElement.clientHeight;
+  const scale = Math.max(heroWidth / HERO_IMAGE_SIZE.width, heroHeight / HERO_IMAGE_SIZE.height);
+  const imageWidth = HERO_IMAGE_SIZE.width * scale;
+  const imageHeight = HERO_IMAGE_SIZE.height * scale;
+  const [posX = "50%", posY = "50%"] = getComputedStyle(scene).backgroundPosition.split(" ");
+  const ratio = (value) => (value.endsWith("%") ? parseFloat(value) / 100 : 0.5);
+  const offsetX = (heroWidth - imageWidth) * ratio(posX);
+  const offsetY = (heroHeight - imageHeight) * ratio(posY);
+
+  hit.style.left = `${offsetX + DOG_BOX.left * imageWidth}px`;
+  hit.style.top = `${offsetY + DOG_BOX.top * imageHeight}px`;
+  hit.style.width = `${(DOG_BOX.right - DOG_BOX.left) * imageWidth}px`;
+  hit.style.height = `${(DOG_BOX.bottom - DOG_BOX.top) * imageHeight}px`;
+
+  // Слой головы показывает ту же картинку, поэтому вырезаем именно голову дога.
+  if (dogHeadElement) {
+    const x = (fraction) => offsetX + fraction * imageWidth;
+    const y = (fraction) => offsetY + fraction * imageHeight;
+    // Мягкая маска вместо жёсткого clip-path: при повороте не видно шва.
+    const mask =
+      `radial-gradient(${DOG_HEAD.rx * imageWidth * 1.15}px ${DOG_HEAD.ry * imageHeight * 1.15}px at ` +
+      `${x(DOG_HEAD.cx)}px ${y(DOG_HEAD.cy)}px, #000 62%, transparent 100%)`;
+    dogHeadElement.style.clipPath = "none";
+    dogHeadElement.style.webkitMaskImage = mask;
+    dogHeadElement.style.maskImage = mask;
+    dogHeadElement.style.transformOrigin = `${x(DOG_HEAD.pivotX)}px ${y(DOG_HEAD.pivotY)}px`;
+  }
+}
+
+function initializeDogHit() {
+  const hit = $("[data-dog-hit]");
+
+  if (!hit) {
+    return;
+  }
+
+  positionDogHitArea();
+  window.addEventListener("resize", rafThrottle(positionDogHitArea));
+
+  hit.addEventListener("click", () => {
+    if (isDogAnimating) {
+      return;
+    }
+
+    initializeAudio();
+    trackEvent("dog_pet");
+    void playDogHeadAnimation();
+    void playDogHowl();
+  });
+}
+
+/* ------------------------------------------------------------------ */
+/* Таймер в названии вкладки, пока она в фоне                           */
+/* ------------------------------------------------------------------ */
+
+const originalTitle = document.title;
+let titleIntervalId = null;
+
+function updateTabTitle() {
+  document.title = `${formatTime(getRemainingSeconds())} · Мечта. 9:59`;
+}
+
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) {
+    updateTabTitle();
+    titleIntervalId = window.setInterval(updateTabTitle, 1000);
+    return;
+  }
+
+  window.clearInterval(titleIntervalId);
+  titleIntervalId = null;
+  document.title = originalTitle;
+});
+
+/* ------------------------------------------------------------------ */
+/* Отклик на скачивание                                                */
+/* ------------------------------------------------------------------ */
+
+document.addEventListener("click", (event) => {
+  const card = event.target instanceof Element ? event.target.closest(".about-panel__format-card") : null;
+
+  if (!card || card.classList.contains("is-downloading")) {
+    return;
+  }
+
+  const action = card.querySelector(".about-panel__format-action");
+  const original = action?.textContent;
+  card.classList.add("is-downloading");
+
+  if (action) {
+    action.textContent = "✓ Скачивается";
+  }
+
+  showToast("Спасибо, что читаете «Мечту»");
+
+  window.setTimeout(() => {
+    card.classList.remove("is-downloading");
+
+    if (action && original) {
+      action.textContent = original;
+    }
+  }, 4000);
+});
+
+/* ------------------------------------------------------------------ */
 /* PWA                                                                 */
 /* ------------------------------------------------------------------ */
 
@@ -1747,6 +1934,12 @@ initializeBookTilt();
 initializeCardGlow();
 initializeQuoteBreak();
 initializeSignature();
+initializeDogHit();
+
+// После вступления снимаем класс, чтобы анимации не повторялись при перерисовке.
+if (document.documentElement.classList.contains("intro-play")) {
+  window.setTimeout(() => document.documentElement.classList.remove("intro-play"), 5200);
+}
 initializeFireAnimation();
 initializeAudio();
 startCountdown();

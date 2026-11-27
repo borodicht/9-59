@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Эта дверь никуда не ведёт — «Мечта. 9:59»</title>
+    <meta name="robots" content="noindex" />
+    <meta name="theme-color" content="#040404" />
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500&family=Forum&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+      }
+
+      body {
+        display: grid;
+        place-items: center;
+        overflow: hidden;
+        background: #040404;
+        color: #dfd2bf;
+        font-family: "Cormorant Garamond", serif;
+        text-align: center;
+      }
+
+      /* Та же комната, но размытая и почти в темноте — как воспоминание. */
+      body::before {
+        content: "";
+        position: fixed;
+        inset: -2rem;
+        background:
+          radial-gradient(circle at 50% 50%, rgba(0, 0, 0, 0.45), rgba(0, 0, 0, 0.92) 70%),
+          url("/assets/images/hero-room-v1.webp") center / cover no-repeat;
+        filter: blur(10px) brightness(0.55);
+      }
+
+      main {
+        position: relative;
+        display: grid;
+        justify-items: center;
+        gap: 1.2rem;
+        padding: 2rem;
+      }
+
+      .code {
+        margin: 0;
+        color: #b79262;
+        font-family: "Forum", serif;
+        font-size: 1rem;
+        letter-spacing: 0.4em;
+      }
+
+      h1 {
+        margin: 0;
+        font-family: "Forum", serif;
+        font-size: clamp(2.2rem, 6vw, 4rem);
+        font-weight: 400;
+        letter-spacing: 0.06em;
+        line-height: 1.1;
+        text-wrap: balance;
+      }
+
+      p {
+        margin: 0;
+        max-width: 28rem;
+        color: rgba(223, 210, 191, 0.78);
+        font-size: clamp(1.1rem, 2vw, 1.3rem);
+        line-height: 1.6;
+      }
+
+      a {
+        margin-top: 1rem;
+        padding: 0.85rem 1.5rem;
+        border: 1px solid rgba(183, 146, 98, 0.5);
+        color: #b79262;
+        font-family: "Forum", serif;
+        font-size: 0.95rem;
+        letter-spacing: 0.18em;
+        text-decoration: none;
+        text-transform: uppercase;
+        transition: background-color 200ms ease;
+      }
+
+      a:hover {
+        background: rgba(183, 146, 98, 0.12);
+      }
+
+      a:focus-visible {
+        outline: 1px solid rgba(220, 183, 128, 0.78);
+        outline-offset: 3px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <p class="code">404</p>
+      <h1>Эта дверь никуда не&nbsp;ведёт</h1>
+      <p>
+        За&nbsp;ней нет ни&nbsp;прошлого, ни&nbsp;будущего&nbsp;— только пустота.
+        Но&nbsp;камин в&nbsp;комнате всё ещё горит.
+      </p>
+      <a href="/">Вернуться в&nbsp;комнату</a>
+    </main>
+  </body>
+</html>
