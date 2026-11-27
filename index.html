@@ -4,6 +4,17 @@
     <script>
       document.documentElement.classList.add("js");
 
+      // Кинематографичное начало — один раз за сессию и только без «уменьшения движения».
+      try {
+        if (
+          !window.sessionStorage.getItem("intro-seen") &&
+          !window.matchMedia("(prefers-reduced-motion: reduce)").matches
+        ) {
+          document.documentElement.classList.add("intro-play");
+          window.sessionStorage.setItem("intro-seen", "1");
+        }
+      } catch (error) {}
+
       // Google Consent Mode v2: аналитика по умолчанию без cookies,
       // пока посетитель не нажмёт «Разрешить» в баннере.
       window.dataLayer = window.dataLayer || [];
@@ -222,6 +233,13 @@
         </p>
       </div>
 
+      <button
+        class="hero__dog-hit"
+        type="button"
+        data-dog-hit
+        aria-label="Погладить собаку"
+      ></button>
+
       <a class="hero__scroll-cue" href="#fragment" aria-label="Листать к описанию книги">
         <span class="hero__scroll-line" aria-hidden="true"></span>
       </a>
@@ -267,15 +285,15 @@
 
           <section class="about-panel__copy" aria-labelledby="about-title">
             <h2 class="about-panel__kicker" id="about-title">
-              <span class="chapter-mark" aria-hidden="true">I</span>О КНИГЕ
+              <span class="chapter-mark" aria-hidden="true">ГЛАВА I</span>О&nbsp;КНИГЕ
             </h2>
             <p class="about-panel__text">
               Иногда, чтобы найти свободу, нужно перестать бороться. Принять.
-              Отпустить. Позволить. И тогда дверь откроется.
+              Отпустить. Позволить. И&nbsp;тогда дверь откроется.
             </p>
             <p class="about-panel__text about-panel__text--muted">
-              «Мечта. 9:59» — это путь внутрь себя. Туда, где заканчивается
-              страх и начинается свобода.
+              «Мечта. 9:59»&nbsp;— это путь внутрь себя. Туда, где заканчивается
+              страх и&nbsp;начинается свобода.
             </p>
             <button
               class="about-panel__link"
@@ -310,7 +328,7 @@
                 <span class="about-panel__format-meta">
                   <span class="about-panel__format-name">PDF</span>
                   <span class="about-panel__format-action">Скачать</span>
-                  <span class="about-panel__format-hint">1,7 МБ · для печати и компьютера</span>
+                  <span class="about-panel__format-hint">1,7&nbsp;МБ<br />для&nbsp;печати и&nbsp;компьютера</span>
                 </span>
               </a>
               <a
@@ -326,7 +344,7 @@
                 <span class="about-panel__format-meta">
                   <span class="about-panel__format-name">EPUB</span>
                   <span class="about-panel__format-action">Скачать</span>
-                  <span class="about-panel__format-hint">1,4 МБ · для телефона и читалок</span>
+                  <span class="about-panel__format-hint">1,4&nbsp;МБ<br />для&nbsp;телефона и&nbsp;читалок</span>
                 </span>
               </a>
               <a
@@ -342,12 +360,12 @@
                 <span class="about-panel__format-meta">
                   <span class="about-panel__format-name">FB2</span>
                   <span class="about-panel__format-action">Скачать</span>
-                  <span class="about-panel__format-hint">1,0 МБ · для PocketBook, ReadEra</span>
+                  <span class="about-panel__format-hint">1,0&nbsp;МБ<br />для&nbsp;PocketBook, ReadEra</span>
                 </span>
               </a>
             </div>
             <p class="about-panel__text about-panel__text--muted about-panel__text--narrow">
-              Выберите удобный формат и скачайте книгу бесплатно.
+              Выберите удобный формат и&nbsp;скачайте книгу бесплатно.
             </p>
           </section>
         </div>
@@ -355,21 +373,21 @@
 
       <figure class="quote-break" data-quote-break>
         <div class="quote-break__quotes" data-reveal="title">
-          <!-- Можно добавить несколько <blockquote>: при каждом визите покажется случайная. -->
+          <!-- Можно добавить несколько <blockquote>: при&nbsp;каждом визите покажется случайная. -->
           <blockquote class="quote-break__quote">
             <p>Каждый день&nbsp;— это монета, которую ты тратишь.</p>
           </blockquote>
           <blockquote class="quote-break__quote">
-            <p>Люди начинают понимать ценность времени только тогда, когда оно подходит к концу.</p>
+            <p>Люди начинают понимать ценность времени только тогда, когда оно подходит к&nbsp;концу.</p>
           </blockquote>
           <blockquote class="quote-break__quote">
-            <p>Отказ&nbsp;— это выбор, а выбор&nbsp;— та же дверь, только без ручки и полотна.</p>
+            <p>Отказ&nbsp;— это выбор, а&nbsp;выбор&nbsp;— та же дверь, только без&nbsp;ручки и&nbsp;полотна.</p>
           </blockquote>
           <blockquote class="quote-break__quote">
-            <p>Все возвращаются домой&nbsp;— лишь затем, чтобы через какое-то время снова собраться в путь.</p>
+            <p>Все возвращаются домой&nbsp;— лишь затем, чтобы через какое-то время снова собраться в&nbsp;путь.</p>
           </blockquote>
           <blockquote class="quote-break__quote">
-            <p>Иногда самый большой поступок&nbsp;— не менять.</p>
+            <p>Иногда самый большой поступок&nbsp;— не&nbsp;менять.</p>
           </blockquote>
         </div>
         <figcaption class="quote-break__caption" data-reveal="label">«Мечта. 9:59»</figcaption>
@@ -401,26 +419,24 @@
 
           <div class="author-section__content">
             <p class="author-section__kicker" data-reveal="label">
-              <span class="chapter-mark" aria-hidden="true">II</span>АВТОР
+              <span class="chapter-mark" aria-hidden="true">ГЛАВА II</span>АВТОР
             </p>
             <h2 class="author-section__name" id="author-title" data-reveal="title">
               Тимофей Бородич
             </h2>
             <div class="author-section__bio" data-reveal="body">
               <p>
-                <strong>Тимофей Бородич</strong> — писатель и музыкант, для
-                которого истории всегда были способом говорить о самом важном.
+                <strong>Тимофей Бородич</strong>&nbsp;— писатель и&nbsp;музыкант, для&nbsp;которого истории всегда были способом говорить о&nbsp;самом важном.
               </p>
               <p>
-                В своем дебютном романе <strong>«Мечта. 9:59»</strong> он
-                соединяет психологическую глубину, философские размышления и
-                элементы мистического повествования, создавая историю о выборе,
-                страхе, любви и свободе.
+                В&nbsp;своем дебютном романе <strong>«Мечта. 9:59»</strong> он
+                соединяет психологическую глубину, философские размышления и&nbsp;элементы мистического повествования, создавая историю о&nbsp;выборе,
+                страхе, любви и&nbsp;свободе.
               </p>
               <p>
-                Его книга не стремится дать готовые ответы — она приглашает
+                Его&nbsp;книга не&nbsp;стремится дать готовые ответы&nbsp;— она приглашает
                 читателя остановиться, задуматься, почувствовать ценность
-                времени, осознать истинную цену свободы и вновь поверить в силу
+                времени, осознать истинную цену свободы и&nbsp;вновь поверить в&nbsp;силу
                 любви.
               </p>
             </div>
@@ -439,17 +455,66 @@
         </div>
       </section>
 
+      <section class="reviews" id="reviews" aria-labelledby="reviews-title">
+        <div class="reviews__inner">
+          <p class="reviews__kicker" data-reveal="label">
+            <span class="chapter-mark" aria-hidden="true">ГЛАВА III</span>ЧИТАТЕЛИ
+          </p>
+          <h2 class="reviews__title" id="reviews-title" data-reveal="title">
+            Что&nbsp;пишут о&nbsp;книге
+          </h2>
+          <div class="reviews__grid">
+            <article class="review" data-reveal="body">
+              <p class="review__pull">«Книга, написанная честно, без&nbsp;купюр и&nbsp;очень эмоционально, до&nbsp;мурашек, до&nbsp;слёз.»</p>
+              <details class="review__more">
+                <summary class="review__toggle">Читать отзыв полностью</summary>
+                <div class="review__text">
+                  <p>Твоя книга&nbsp;— откровение и&nbsp;дар! Бесценный дар всем тем людям, которые бродят во&nbsp;мраке и&nbsp;не&nbsp;могут найти свой путь, не&nbsp;могут сделать в&nbsp;жизни правильный выбор… и&nbsp;падают в&nbsp;пропасть…</p>
+                  <p>Лично я&nbsp;благодарю тебя за&nbsp;книгу, написанную честно, без&nbsp;купюр и&nbsp;очень эмоционально, до&nbsp;мурашек, до&nbsp;слёз… Я&nbsp;желаю тебе благополучия, процветания, мира и&nbsp;добра, и&nbsp;не&nbsp;только тебе, но&nbsp;и&nbsp;твоим близким. Горжусь тобой, мой друг!</p>
+                </div>
+              </details>
+              <p class="review__meta">Из&nbsp;сообщения автору</p>
+            </article>
+            <article class="review" data-reveal="body">
+              <p class="review__pull">«Она случайно попала ко&nbsp;мне и&nbsp;была прочитана за&nbsp;один день. Это тяжёлое, но&nbsp;в&nbsp;то же время уникальное произведение.»</p>
+              <details class="review__more">
+                <summary class="review__toggle">Читать отзыв полностью</summary>
+                <div class="review__text">
+                  <p>Здравствуйте! Мы с&nbsp;Вами не&nbsp;знакомы, но&nbsp;хотелось бы выразить благодарность за&nbsp;книгу «Мечта». Она случайно попала ко&nbsp;мне и&nbsp;была прочитана за&nbsp;один день.</p>
+                  <p>Это тяжёлое, но&nbsp;в&nbsp;то же время уникальное произведение. Спектр пережитых эмоций бесконечен, давно такого не&nbsp;было, чтобы книга вызывала такое. Словами даже не&nbsp;описать.</p>
+                  <p>Огромное спасибо, что&nbsp;поднимаете такую важную тему, как&nbsp;зависимость, и&nbsp;в&nbsp;такой нестандартной форме. Удачи Вам и&nbsp;новых открытий в&nbsp;творчестве! Спасибо!</p>
+                </div>
+              </details>
+              <p class="review__meta">Из&nbsp;сообщения автору</p>
+            </article>
+            <article class="review" data-reveal="body">
+              <p class="review__pull">«Я&nbsp;с&nbsp;этой книгой прожила и&nbsp;прочувствовала состояния, кажется, больше, чем за&nbsp;всю свою жизнь.»</p>
+              <details class="review__more">
+                <summary class="review__toggle">Читать отзыв полностью</summary>
+                <div class="review__text">
+                  <p>Привет, Тимофей! Прочла. Я&nbsp;с&nbsp;этой книгой прожила и&nbsp;прочувствовала состояния, кажется, больше, чем за&nbsp;всю свою жизнь. Это такое расширение сознания, такая невероятная возможность увидеть жизнь с&nbsp;другого ракурса!</p>
+                  <p>Невозможно оторваться и&nbsp;больно читать без&nbsp;пауз, тем более когда буквы расплываются из-за&nbsp;слёз. Я&nbsp;читала, останавливалась, откладывала книгу, плакала, шла заваривать чай, обдумывала, возвращала себя в&nbsp;реальность, успокаивалась и&nbsp;снова открывала книгу.</p>
+                  <p>А&nbsp;в&nbsp;некоторых фрагментах ловила дежавю&nbsp;— до&nbsp;боли знакомые для&nbsp;меня чувства и&nbsp;состояния описывались. Захватывающий сюжет, описания переданы настолько ярко, что&nbsp;не&nbsp;ощутить на&nbsp;себе просто невозможно. Табун мурашек и&nbsp;волосы дыбом во&nbsp;время всего прочтения.</p>
+                  <p>Книга&nbsp;— откровение, в&nbsp;которой я&nbsp;нашла даже ответы на&nbsp;свои вопросы, цитаты выписывала себе в&nbsp;заметки. Пиши ещё!</p>
+                </div>
+              </details>
+              <p class="review__meta">Из&nbsp;сообщения автору</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
       <section class="next-book" id="next-book" aria-labelledby="next-book-title">
         <div class="next-book__inner">
           <p class="next-book__kicker" data-reveal="label">
-            <span class="chapter-mark" aria-hidden="true">III</span>СКОРО
+            <span class="chapter-mark" aria-hidden="true">ГЛАВА IV</span>СКОРО
           </p>
           <h2 class="next-book__title" id="next-book-title" data-reveal="title">
             «Пока автобус едет»
           </h2>
           <p class="next-book__text" data-reveal="body">
-            Новый роман Тимофея Бородича. Следите за новостями автора, чтобы
-            не пропустить выход.
+            Новый роман Тимофея Бородича. Следите за&nbsp;новостями автора, чтобы
+            не&nbsp;пропустить выход.
           </p>
           <a
             class="next-book__link"
@@ -459,9 +524,17 @@
             data-reveal="body"
             data-analytics-contact-type="next_book"
           >
-            Узнать о выходе первым
+            Узнать о&nbsp;выходе первым
           </a>
         </div>
+      </section>
+
+      <section class="epilogue" aria-label="Эпилог">
+        <div class="epilogue__embers" aria-hidden="true">
+          <span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+        </div>
+        <p class="epilogue__line" data-reveal="title">Огонь в&nbsp;камине почти угас.</p>
+        <a class="epilogue__link" href="#hero" data-reveal="label">Вернуться к&nbsp;камину</a>
       </section>
     </main>
 
@@ -483,7 +556,7 @@
                 rel="noreferrer noopener"
                 data-analytics-contact-type="website"
               >
-                Связаться с автором
+                Связаться с&nbsp;автором
               </a>
             </p>
           </div>
@@ -492,15 +565,15 @@
         <details class="site-footer__legal">
           <summary class="site-footer__legal-summary">Правовая информация</summary>
           <p class="site-footer__copyright">
-            Все материалы, размещенные на данном сайте, включая текст книги, иллюстрации,
-            дизайн, графику и другие объекты авторского права, принадлежат Тимофею Бородичу
-            и защищены законодательством об авторском праве. Допускается исключительно личное
+            Все материалы, размещенные на&nbsp;данном сайте, включая текст книги, иллюстрации,
+            дизайн, графику и&nbsp;другие объекты авторского права, принадлежат Тимофею Бородичу
+            и&nbsp;защищены законодательством об&nbsp;авторском праве. Допускается исключительно личное
             некоммерческое использование материалов сайта. Любое копирование, распространение,
             публикация, изменение или коммерческое использование произведения полностью или
-            частично без письменного разрешения правообладателя запрещено. Материалы сайта
-            предназначены исключительно для личного ознакомления. Любое воспроизведение,
+            частично без&nbsp;письменного разрешения правообладателя запрещено. Материалы сайта
+            предназначены исключительно для&nbsp;личного ознакомления. Любое воспроизведение,
             распространение, публикация, изменение или использование произведения полностью
-            либо частично в коммерческих целях без письменного разрешения правообладателя
+            либо частично в&nbsp;коммерческих целях без&nbsp;письменного разрешения правообладателя
             запрещено.
           </p>
         </details>
@@ -599,8 +672,7 @@
 
     <div class="consent" role="region" aria-label="Согласие на аналитику" data-consent hidden>
       <p class="consent__text">
-        Сайт использует Google Analytics, чтобы понимать, сколько людей читают и
-        скачивают книгу. Можно отказаться — всё будет работать так же.
+        Сайт использует Google Analytics, чтобы понимать, сколько людей читают и&nbsp;скачивают книгу. Можно отказаться&nbsp;— всё будет работать так же.
       </p>
       <div class="consent__actions">
         <button class="consent__button" type="button" data-consent-accept>Разрешить</button>

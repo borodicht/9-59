@@ -2,7 +2,7 @@
 // Даёт офлайн-доступ к странице и фрагменту книги.
 // После изменения списка файлов или стратегии увеличьте VERSION.
 
-const VERSION = "v3";
+const VERSION = "v4";
 const SHELL_CACHE = `mechta-shell-${VERSION}`;
 const RUNTIME_CACHE = `mechta-runtime-${VERSION}`;
 
