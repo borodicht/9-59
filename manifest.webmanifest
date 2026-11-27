@@ -1,0 +1,25 @@
+{
+  "name": "«Мечта. 9:59» — роман Тимофея Бородича",
+  "short_name": "Мечта. 9:59",
+  "description": "Официальная страница романа «Мечта. 9:59»: фрагмент, музыка и книга в PDF, EPUB и FB2.",
+  "lang": "ru",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#040404",
+  "theme_color": "#040404",
+  "icons": [
+    {
+      "src": "assets/images/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/images/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
