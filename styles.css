@@ -2810,3 +2810,41 @@ body {
     transform: none;
   }
 }
+
+/* ------------------------------------------------------------------ */
+/* Подпись автора                                                      */
+/* ------------------------------------------------------------------ */
+
+.author-section__signature {
+  width: min(15rem, 60%);
+  margin: clamp(1.4rem, 3vw, 2.2rem) 0 0;
+  opacity: 0.9;
+}
+
+.author-section__signature img {
+  width: 100%;
+  height: auto;
+}
+
+/* Проявление слева направо — как будто подпись пишется рукой. */
+.js .author-section__signature img {
+  clip-path: inset(-5% 100% -5% 0);
+  transition: clip-path 2.6s cubic-bezier(0.55, 0.1, 0.35, 1) 0.3s;
+}
+
+.js .author-section__signature.is-signed img {
+  clip-path: inset(-5% -5% -5% 0);
+}
+
+@media (max-width: 768px) {
+  .author-section__signature {
+    margin-inline: auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .js .author-section__signature img {
+    clip-path: none;
+    transition: none;
+  }
+}

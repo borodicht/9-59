@@ -1671,6 +1671,34 @@ function initializeCardGlow() {
   );
 }
 
+// Подпись «пишется» слева направо, когда блок автора появляется на экране.
+function initializeSignature() {
+  const signature = $("[data-signature]");
+
+  if (!signature) {
+    return;
+  }
+
+  if (reduceMotion || !("IntersectionObserver" in window)) {
+    signature.classList.add("is-signed");
+    return;
+  }
+
+  const observer = new IntersectionObserver(
+    ([entry]) => {
+      if (!entry?.isIntersecting) {
+        return;
+      }
+
+      signature.classList.add("is-signed");
+      observer.disconnect();
+    },
+    { threshold: 0.6 }
+  );
+
+  observer.observe(signature);
+}
+
 function initializeQuoteBreak() {
   const quotes = $$(".quote-break__quote");
 
@@ -1718,6 +1746,7 @@ initializeHeroParallax();
 initializeBookTilt();
 initializeCardGlow();
 initializeQuoteBreak();
+initializeSignature();
 initializeFireAnimation();
 initializeAudio();
 startCountdown();
