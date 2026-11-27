@@ -1212,6 +1212,7 @@ let sparkTimeoutId = null;
 let sparkElements = [];
 let isDogAnimating = false;
 let isHeroVisible = true;
+let cinematicFireActive = false;
 
 function initializeFireAnimation() {
   if (!heroElement || heroElement.dataset.fireAnimationInitialized === "true") {
@@ -1243,6 +1244,7 @@ function initializeSparks() {
 
 function canPlaySparks() {
   return (
+    !cinematicFireActive &&
     heroElement?.dataset.fireAnimationInitialized === "true" &&
     !document.hidden &&
     !reduceMotion &&
@@ -1935,6 +1937,30 @@ initializeCardGlow();
 initializeQuoteBreak();
 initializeSignature();
 initializeDogHit();
+
+// «Живой» огонь на WebGL. Если WebGL нет или включено «уменьшение движения» —
+// остаётся прежняя CSS-анимация.
+if (!reduceMotion && heroElement) {
+  import("./fire.js")
+    .then(({ startCinematicFire }) =>
+      startCinematicFire({
+        hero: heroElement,
+        room: $(".hero__room"),
+        scene: $(".hero__scene"),
+        imageSrc: "assets/images/hero-room-v1.webp",
+        isPaused: () => document.hidden || !isHeroVisible || reduceMotion
+      })
+    )
+    .then((started) => {
+      if (started) {
+        cinematicFireActive = true;
+        cancelScheduledSparks();
+      }
+    })
+    .catch(() => {
+      /* остаётся CSS-огонь */
+    });
+}
 
 // После вступления снимаем класс, чтобы анимации не повторялись при перерисовке.
 if (document.documentElement.classList.contains("intro-play")) {
