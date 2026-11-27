@@ -190,8 +190,9 @@
         Включить трек
       </button>
 
-      <div class="hero__scene" aria-hidden="true"></div>
-      <div class="hero__fire" aria-hidden="true">
+      <div class="hero__room" aria-hidden="true">
+      <div class="hero__scene"></div>
+      <div class="hero__fire">
         <div class="hero__firelight"></div>
         <div class="hero__fireplace-flame-area">
           <div class="hero__fire-glow"></div>
@@ -201,8 +202,9 @@
           <div class="hero__spark-pool"></div>
         </div>
       </div>
-      <div class="hero__dog-head" aria-hidden="true"></div>
-      <div class="hero__overlay" aria-hidden="true"></div>
+      <div class="hero__dog-head"></div>
+      <div class="hero__overlay"></div>
+      </div>
 
       <div class="hero__countdown">
         <h1 class="hero__countdown-label" id="hero-title">
@@ -214,13 +216,15 @@
           role="timer"
           aria-label="Обратный таймер"
           tabindex="-1"
-        >
-          09:59
-        </p>
+        ><span class="hero__digit">0</span><span class="hero__digit">9</span><span class="hero__colon">:</span><span class="hero__digit">5</span><span class="hero__digit">9</span></p>
         <p class="hero__tagline hero__tagline--countdown" id="hero-tagline">
           СВОБОДА ЧЕРЕЗ ПРИНЯТИЕ
         </p>
       </div>
+
+      <a class="hero__scroll-cue" href="#fragment" aria-label="Листать к описанию книги">
+        <span class="hero__scroll-line" aria-hidden="true"></span>
+      </a>
 
       <div class="hero__finale" data-timer-finale hidden>
         <p class="hero__finale-quote">
@@ -248,7 +252,8 @@
         aria-labelledby="about-title downloads-title"
       >
         <div class="about-panel__inner">
-          <div class="about-panel__book book-mockup">
+          <div class="about-panel__book book-mockup" data-tilt>
+            <span class="book-mockup__glare" aria-hidden="true"></span>
             <img
               src="assets/images/book-mockup.webp"
               data-reader-origin
@@ -261,7 +266,9 @@
           </div>
 
           <section class="about-panel__copy" aria-labelledby="about-title">
-            <h2 class="about-panel__kicker" id="about-title">О КНИГЕ</h2>
+            <h2 class="about-panel__kicker" id="about-title">
+              <span class="chapter-mark" aria-hidden="true">I</span>О КНИГЕ
+            </h2>
             <p class="about-panel__text">
               Иногда, чтобы найти свободу, нужно перестать бороться. Принять.
               Отпустить. Позволить. И тогда дверь откроется.
@@ -303,6 +310,7 @@
                 <span class="about-panel__format-meta">
                   <span class="about-panel__format-name">PDF</span>
                   <span class="about-panel__format-action">Скачать</span>
+                  <span class="about-panel__format-hint">1,7 МБ · для печати и компьютера</span>
                 </span>
               </a>
               <a
@@ -318,6 +326,7 @@
                 <span class="about-panel__format-meta">
                   <span class="about-panel__format-name">EPUB</span>
                   <span class="about-panel__format-action">Скачать</span>
+                  <span class="about-panel__format-hint">1,4 МБ · для телефона и читалок</span>
                 </span>
               </a>
               <a
@@ -333,6 +342,7 @@
                 <span class="about-panel__format-meta">
                   <span class="about-panel__format-name">FB2</span>
                   <span class="about-panel__format-action">Скачать</span>
+                  <span class="about-panel__format-hint">1,0 МБ · для PocketBook, ReadEra</span>
                 </span>
               </a>
             </div>
@@ -342,6 +352,28 @@
           </section>
         </div>
       </section>
+
+      <figure class="quote-break" data-quote-break>
+        <div class="quote-break__quotes" data-reveal="title">
+          <!-- Можно добавить несколько <blockquote>: при каждом визите покажется случайная. -->
+          <blockquote class="quote-break__quote">
+            <p>Каждый день&nbsp;— это монета, которую ты тратишь.</p>
+          </blockquote>
+          <blockquote class="quote-break__quote">
+            <p>Люди начинают понимать ценность времени только тогда, когда оно подходит к концу.</p>
+          </blockquote>
+          <blockquote class="quote-break__quote">
+            <p>Отказ&nbsp;— это выбор, а выбор&nbsp;— та же дверь, только без ручки и полотна.</p>
+          </blockquote>
+          <blockquote class="quote-break__quote">
+            <p>Все возвращаются домой&nbsp;— лишь затем, чтобы через какое-то время снова собраться в путь.</p>
+          </blockquote>
+          <blockquote class="quote-break__quote">
+            <p>Иногда самый большой поступок&nbsp;— не менять.</p>
+          </blockquote>
+        </div>
+        <figcaption class="quote-break__caption" data-reveal="label">«Мечта. 9:59»</figcaption>
+      </figure>
 
       <section class="author-section" id="author" aria-labelledby="author-title">
         <div class="author-section__inner">
@@ -368,7 +400,9 @@
           </div>
 
           <div class="author-section__content">
-            <p class="author-section__kicker" data-reveal="label">АВТОР</p>
+            <p class="author-section__kicker" data-reveal="label">
+              <span class="chapter-mark" aria-hidden="true">II</span>АВТОР
+            </p>
             <h2 class="author-section__name" id="author-title" data-reveal="title">
               Тимофей Бородич
             </h2>
@@ -390,13 +424,26 @@
                 любви.
               </p>
             </div>
+
+            <figure class="author-section__signature" data-signature>
+              <img
+                src="assets/images/signature.svg"
+                alt="Подпись Тимофея Бородича"
+                width="599"
+                height="381"
+                loading="lazy"
+                decoding="async"
+              />
+            </figure>
           </div>
         </div>
       </section>
 
       <section class="next-book" id="next-book" aria-labelledby="next-book-title">
         <div class="next-book__inner">
-          <p class="next-book__kicker" data-reveal="label">СКОРО</p>
+          <p class="next-book__kicker" data-reveal="label">
+            <span class="chapter-mark" aria-hidden="true">III</span>СКОРО
+          </p>
           <h2 class="next-book__title" id="next-book-title" data-reveal="title">
             «Пока автобус едет»
           </h2>
@@ -442,18 +489,21 @@
           </div>
         </div>
 
-        <p class="site-footer__copyright">
-          Все материалы, размещенные на данном сайте, включая текст книги, иллюстрации,
-          дизайн, графику и другие объекты авторского права, принадлежат Тимофею Бородичу
-          и защищены законодательством об авторском праве. Допускается исключительно личное
-          некоммерческое использование материалов сайта. Любое копирование, распространение,
-          публикация, изменение или коммерческое использование произведения полностью или
-          частично без письменного разрешения правообладателя запрещено. Материалы сайта
-          предназначены исключительно для личного ознакомления. Любое воспроизведение,
-          распространение, публикация, изменение или использование произведения полностью
-          либо частично в коммерческих целях без письменного разрешения правообладателя
-          запрещено.
-        </p>
+        <details class="site-footer__legal">
+          <summary class="site-footer__legal-summary">Правовая информация</summary>
+          <p class="site-footer__copyright">
+            Все материалы, размещенные на данном сайте, включая текст книги, иллюстрации,
+            дизайн, графику и другие объекты авторского права, принадлежат Тимофею Бородичу
+            и защищены законодательством об авторском праве. Допускается исключительно личное
+            некоммерческое использование материалов сайта. Любое копирование, распространение,
+            публикация, изменение или коммерческое использование произведения полностью или
+            частично без письменного разрешения правообладателя запрещено. Материалы сайта
+            предназначены исключительно для личного ознакомления. Любое воспроизведение,
+            распространение, публикация, изменение или использование произведения полностью
+            либо частично в коммерческих целях без письменного разрешения правообладателя
+            запрещено.
+          </p>
+        </details>
       </div>
     </footer>
 
@@ -474,7 +524,7 @@
             <p class="reader-dialog__label">ФРАГМЕНТ</p>
             <h2 class="reader-dialog__title" id="reader-title">МЕЧТА. 9:59</h2>
             <div class="reader-dialog__rule" aria-hidden="true"></div>
-            <div class="reader-dialog__tools" role="group" aria-label="Размер текста">
+            <div class="reader-dialog__tools" role="group" aria-label="Настройки чтения">
               <button
                 class="reader-dialog__tool"
                 type="button"
@@ -490,6 +540,15 @@
                 aria-label="Увеличить текст"
               >
                 A+
+              </button>
+              <button
+                class="reader-dialog__tool reader-dialog__tool--theme"
+                type="button"
+                data-reader-theme
+                aria-pressed="false"
+                aria-label="Ночной режим"
+              >
+                <span aria-hidden="true">☾</span>
               </button>
             </div>
           </header>
