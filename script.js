@@ -1,26 +1,71 @@
-"use strict";
+// «Мечта. 9:59» — логика сайта. Подключается как ES-модуль (type="module"),
+// поэтому ничего не попадает в глобальную область и скрипт выполняется отложенно.
 
-const atmosphereButton = document.querySelector(".hero__atmosphere-button");
-const heroElement = document.querySelector(".hero");
-const timerElement = document.querySelector(".hero__timer");
-const dogHeadElement = document.querySelector(".hero__dog-head");
-const sparkPoolElement = document.querySelector(".hero__spark-pool");
-const readerTriggerElement = document.querySelector("[data-open-reader]");
-const readerLayerElement = document.querySelector(".reader-layer");
-const readerDialogElement = document.querySelector(".reader-dialog");
-const readerPageElement = document.querySelector(".reader-dialog__page");
-const readerMetaElement = document.querySelector("[data-reader-meta]");
-const readerPrevButton = document.querySelector("[data-reader-prev]");
-const readerNextButton = document.querySelector("[data-reader-next]");
-const readerCloseElements = document.querySelectorAll("[data-close-reader]");
-const revealElements = document.querySelectorAll("[data-reveal]");
-const downloadLinkElements = document.querySelectorAll("[data-analytics-event]");
-const authorSectionElement = document.querySelector("#author");
-const authorContactLinkElements = document.querySelectorAll("[data-analytics-contact-type]");
-const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+/* ------------------------------------------------------------------ */
+/* Утилиты                                                             */
+/* ------------------------------------------------------------------ */
+
+const $ = (selector, root = document) => root.querySelector(selector);
+const $$ = (selector, root = document) => Array.from(root.querySelectorAll(selector));
+
+const IS_LOCAL = ["localhost", "127.0.0.1", "[::1]"].includes(window.location.hostname);
+
+const store = {
+  get(area, key) {
+    try {
+      return window[area].getItem(key);
+    } catch {
+      return null;
+    }
+  },
+  set(area, key, value) {
+    try {
+      window[area].setItem(key, String(value));
+    } catch {
+      /* приватный режим или storage запрещён — просто не запоминаем */
+    }
+  }
+};
+
+const motionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+let reduceMotion = motionQuery.matches;
+
+function wait(ms) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+/* ------------------------------------------------------------------ */
+/* Элементы                                                            */
+/* ------------------------------------------------------------------ */
+
+const atmosphereButton = $(".hero__atmosphere-button");
+const heroElement = $(".hero");
+const timerElement = $(".hero__timer");
+const finaleElement = $("[data-timer-finale]");
+const dogHeadElement = $(".hero__dog-head");
+const sparkPoolElement = $(".hero__spark-pool");
+const readerDialog = $(".reader-layer");
+const readerSheet = $(".reader-dialog__sheet");
+const readerPageElement = $(".reader-dialog__page");
+const readerMetaElement = $("[data-reader-meta]");
+const readerProgressElement = $("[data-reader-progress]");
+const readerPrevButton = $("[data-reader-prev]");
+const readerNextButton = $("[data-reader-next]");
+const readerShareButton = $("[data-reader-share]");
+const readerFontButtons = $$("[data-reader-font]");
+const readerOriginImage = $("[data-reader-origin]");
+const revealElements = $$("[data-reveal]");
+const authorSectionElement = $("#author");
+const toastElement = $("[data-toast]");
+const consentElement = $("[data-consent]");
+
+/* ------------------------------------------------------------------ */
+/* Константы                                                           */
+/* ------------------------------------------------------------------ */
 
 const TIMER_DURATION_MS = (9 * 60 + 59) * 1000;
 const TIMER_TICK_MS = 250;
+const TIMER_STORAGE_KEY = "timer-end";
 const MUSIC_FADE_DURATION_MS = 800;
 const SPARK_POOL_SIZE = 6;
 const SPARK_BURST_MIN_DELAY_MS = 8000;
@@ -34,17 +79,17 @@ const DOG_HEAD_ANIMATION_DURATION_MS = 7000;
 const DOG_HEAD_ANIMATION_REDUCED_DURATION_MS = 2200;
 const READER_CONTENT_PATH = "assets/content/fragment.json";
 const READER_CLOSE_DURATION_MS = 320;
-const READER_FOCUSABLE_SELECTOR = [
-  "button:not([disabled])",
-  "a[href]",
-  "[tabindex]:not([tabindex='-1'])"
-].join(", ");
+const READER_PAGE_KEY = "reader-page";
+const READER_FONT_KEY = "reader-font-step";
+const READER_FONT_MIN = -2;
+const READER_FONT_MAX = 3;
+const QUOTE_MIN_LENGTH = 12;
+const QUOTE_MAX_LENGTH = 420;
+const SITE_URL = "https://9-59.site/";
 
 const AUDIO_SOURCES = {
-  fireplace: {
-    mp3: "./assets/audio/ambient/fireplace.mp3"
-  },
   clock: {
+    opus: "./assets/audio/ambient/clock.ogg",
     mp3: "./assets/audio/ambient/clock.mp3"
   },
   dogHowl: {
@@ -57,194 +102,143 @@ const AUDIO_SOURCES = {
 };
 
 const AUDIO_VOLUME = {
-  fireplace: 0,
   clock: 0.16,
   dogHowl: 1,
   bookTrack: 0.45
 };
 
-const audioState = {
-  initialized: false,
-  ambientStarted: false,
-  isHowlPlaying: false,
-  interactionHandlersBound: false,
-  fadeFrameId: null,
-  firstUserInteractionHandler: null,
-  ambience: {},
-  effects: {},
-  music: null,
-  loadRequested: {
-    fireplace: false,
-    clock: false,
-    dogHowl: false,
-    bookTrack: false
-  },
-  availability: {
-    fireplace: "unknown",
-    clock: "unknown",
-    dogHowl: "unknown",
-    bookTrack: "unknown"
-  }
-};
+const CAN_PLAY_OPUS = (() => {
+  const audio = document.createElement("audio");
+  return typeof audio.canPlayType === "function" &&
+    audio.canPlayType('audio/ogg; codecs="opus"') !== "";
+})();
 
-const AUDIO_CAPABILITIES = {
-  opus: (() => {
-    const audio = document.createElement("audio");
-
-    if (typeof audio.canPlayType !== "function") {
-      return false;
-    }
-
-    return audio.canPlayType('audio/ogg; codecs="opus"') !== "";
-  })()
-};
-
-let countdownEndTime = Date.now() + TIMER_DURATION_MS;
-let timerIntervalId = null;
-let sparkTimeoutId = null;
-let sparkElements = [];
-let isDogAnimating = false;
-let isReaderOpen = false;
-let readerContentPromise = null;
-let readerContent = null;
-let currentReaderPageIndex = 0;
-let lastReaderTrigger = null;
-
-const howledMinutes = new Set();
-const analyticsState = {
-  authorSectionTracked: false,
-  musicPlayingTracked: false,
-  musicPauseTracked: false
-};
-
-function normalizeEventParams(parameters = {}) {
-  return Object.fromEntries(
-    Object.entries(parameters).filter(([, value]) => value !== undefined)
-  );
-}
+/* ------------------------------------------------------------------ */
+/* Аналитика и согласие                                                */
+/* ------------------------------------------------------------------ */
 
 function trackEvent(eventName, parameters = {}) {
   if (!eventName) {
     return;
   }
 
-  const payload = normalizeEventParams(parameters);
+  const payload = Object.fromEntries(
+    Object.entries(parameters).filter(([, value]) => value !== undefined)
+  );
 
   try {
     if (typeof window.gtag === "function") {
       window.gtag("event", eventName, payload);
-      return;
-    }
-
-    if (typeof window.plausible === "function") {
+    } else if (typeof window.plausible === "function") {
       window.plausible(eventName, { props: payload });
-      return;
-    }
-
-    if (window.umami?.track) {
+    } else if (window.umami?.track) {
       window.umami.track(eventName, payload);
-      return;
-    }
-
-    if (Array.isArray(window.dataLayer)) {
+    } else if (Array.isArray(window.dataLayer)) {
       window.dataLayer.push({ event: eventName, ...payload });
-      return;
     }
   } catch (error) {
-    console.debug("[analytics:error]", eventName, error);
+    if (IS_LOCAL) {
+      console.debug("[analytics:error]", eventName, error);
+    }
     return;
   }
 
-  console.debug("[analytics]", eventName, payload);
+  if (IS_LOCAL) {
+    console.debug("[analytics]", eventName, payload);
+  }
 }
 
-function initializeDownloadAnalytics() {
-  downloadLinkElements.forEach((link) => {
-    link.addEventListener("click", () => {
-      trackEvent(link.dataset.analyticsEvent, {
-        file_type: link.dataset.analyticsFileType
+function initializeConsent() {
+  if (!consentElement) {
+    return;
+  }
+
+  if (!store.get("localStorage", "analytics-consent")) {
+    consentElement.hidden = false;
+  }
+
+  const decide = (granted) => {
+    store.set("localStorage", "analytics-consent", granted ? "granted" : "denied");
+
+    if (typeof window.gtag === "function") {
+      window.gtag("consent", "update", {
+        analytics_storage: granted ? "granted" : "denied"
       });
-    });
-  });
+    }
+
+    consentElement.hidden = true;
+  };
+
+  $("[data-consent-accept]", consentElement)?.addEventListener("click", () => decide(true));
+  $("[data-consent-decline]", consentElement)?.addEventListener("click", () => decide(false));
 }
 
 function initializeAuthorAnalytics() {
-  if (authorSectionElement) {
-    if (!("IntersectionObserver" in window)) {
-      analyticsState.authorSectionTracked = true;
-      trackEvent("author_section_view");
-    } else {
-      const observer = new IntersectionObserver(
-        (entries) => {
-          const [entry] = entries;
-
-          if (!entry?.isIntersecting || analyticsState.authorSectionTracked) {
-            return;
-          }
-
-          analyticsState.authorSectionTracked = true;
-          trackEvent("author_section_view");
-          observer.disconnect();
-        },
-        {
-          threshold: 0.35
-        }
-      );
-
-      observer.observe(authorSectionElement);
-    }
+  if (!authorSectionElement) {
+    return;
   }
 
-  authorContactLinkElements.forEach((link) => {
-    link.addEventListener("click", () => {
-      trackEvent("author_contact_click", {
-        contact_type: link.dataset.analyticsContactType
-      });
-    });
-  });
+  if (!("IntersectionObserver" in window)) {
+    trackEvent("author_section_view");
+    return;
+  }
+
+  const observer = new IntersectionObserver(
+    ([entry]) => {
+      if (!entry?.isIntersecting) {
+        return;
+      }
+
+      trackEvent("author_section_view");
+      observer.disconnect();
+    },
+    { threshold: 0.35 }
+  );
+
+  observer.observe(authorSectionElement);
 }
 
-if (atmosphereButton) {
-  atmosphereButton.addEventListener("click", () => {
-    void toggleBookTrack();
-  });
+/* ------------------------------------------------------------------ */
+/* Уведомления (popover поверх модального окна)                        */
+/* ------------------------------------------------------------------ */
+
+let toastTimeoutId = null;
+
+function showToast(message) {
+  if (!toastElement) {
+    return;
+  }
+
+  toastElement.textContent = message;
+  window.clearTimeout(toastTimeoutId);
+
+  if (typeof toastElement.showPopover === "function") {
+    // Пересоздаём, чтобы уведомление оказалось над уже открытым <dialog>.
+    if (toastElement.matches(":popover-open")) {
+      toastElement.hidePopover();
+    }
+    toastElement.showPopover();
+  } else {
+    toastElement.classList.add("is-visible");
+  }
+
+  toastTimeoutId = window.setTimeout(() => {
+    if (typeof toastElement.hidePopover === "function") {
+      if (toastElement.matches(":popover-open")) {
+        toastElement.hidePopover();
+      }
+    } else {
+      toastElement.classList.remove("is-visible");
+    }
+  }, 3200);
 }
 
-if (readerTriggerElement) {
-  readerTriggerElement.addEventListener("click", (event) => {
-    event.preventDefault();
-    void openReader();
-  });
-}
+/* ------------------------------------------------------------------ */
+/* Появление блоков при прокрутке                                       */
+/* ------------------------------------------------------------------ */
 
-readerCloseElements.forEach((element) => {
-  element.addEventListener("click", () => {
-    closeReader();
-  });
-});
-
-if (readerPrevButton) {
-  readerPrevButton.addEventListener("click", () => {
-    changeReaderPage(-1);
-  });
-}
-
-if (readerNextButton) {
-  readerNextButton.addEventListener("click", () => {
-    changeReaderPage(1);
-  });
-}
-
-initializeRevealAnimations();
-initializeDownloadAnalytics();
-initializeAuthorAnalytics();
-
-function formatTime(totalSeconds) {
-  const safeSeconds = Math.max(0, totalSeconds);
-  const minutes = Math.floor(safeSeconds / 60);
-  const seconds = safeSeconds % 60;
-
-  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+function revealAll() {
+  revealElements.forEach((element) => element.classList.add("is-visible"));
 }
 
 function initializeRevealAnimations() {
@@ -252,10 +246,14 @@ function initializeRevealAnimations() {
     return;
   }
 
-  if (prefersReducedMotion.matches || !("IntersectionObserver" in window)) {
-    revealElements.forEach((element) => {
-      element.classList.add("is-visible");
-    });
+  if (reduceMotion || !("IntersectionObserver" in window)) {
+    revealAll();
+    return;
+  }
+
+  // Браузеры со scroll-driven animations делают всё на CSS (animation-timeline: view()).
+  if (window.CSS?.supports?.("animation-timeline: view()")) {
+    document.documentElement.classList.add("has-scroll-timeline");
     return;
   }
 
@@ -270,24 +268,52 @@ function initializeRevealAnimations() {
         observer.unobserve(entry.target);
       });
     },
-    {
-      threshold: 0.2,
-      rootMargin: "0px 0px -40px 0px"
-    }
+    { threshold: 0.2, rootMargin: "0px 0px -40px 0px" }
   );
 
-  revealElements.forEach((element) => {
-    observer.observe(element);
-  });
+  revealElements.forEach((element) => observer.observe(element));
 }
 
-async function loadReaderContent() {
-  if (readerContent) {
-    return readerContent;
+/* ------------------------------------------------------------------ */
+/* Читалка фрагмента (нативный <dialog>)                                */
+/* ------------------------------------------------------------------ */
+
+const reader = {
+  content: null,
+  contentPromise: null,
+  pageIndex: 0,
+  opening: false,
+  closeTimeoutId: null,
+  lastTrigger: null,
+  fontStep: clampNumber(Number(store.get("localStorage", READER_FONT_KEY)) || 0, READER_FONT_MIN, READER_FONT_MAX),
+  selectedQuote: "",
+  closingTransition: null
+};
+
+function clampNumber(value, min, max) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function isValidReaderContent(data) {
+  return Boolean(
+    data &&
+      Array.isArray(data.pages) &&
+      data.pages.length > 0 &&
+      data.pages.every(
+        (page) =>
+          Array.isArray(page?.paragraphs) &&
+          page.paragraphs.every((paragraph) => typeof paragraph === "string")
+      )
+  );
+}
+
+function loadReaderContent() {
+  if (reader.content) {
+    return Promise.resolve(reader.content);
   }
 
-  if (!readerContentPromise) {
-    readerContentPromise = fetch(READER_CONTENT_PATH)
+  if (!reader.contentPromise) {
+    reader.contentPromise = fetch(READER_CONTENT_PATH)
       .then((response) => {
         if (!response.ok) {
           throw new Error(`Failed to load fragment content: ${response.status}`);
@@ -296,289 +322,863 @@ async function loadReaderContent() {
         return response.json();
       })
       .then((data) => {
-        readerContent = data;
+        if (!isValidReaderContent(data)) {
+          throw new Error("Fragment content has an unexpected shape");
+        }
+
+        reader.content = data;
         return data;
+      })
+      .catch((error) => {
+        // Не кэшируем ошибку: следующая попытка снова пойдёт в сеть.
+        reader.contentPromise = null;
+        throw error;
       });
   }
 
-  return readerContentPromise;
+  return reader.contentPromise;
 }
 
-function renderReaderPage(index) {
-  if (!readerContent || !readerPageElement || !readerMetaElement || !readerPrevButton || !readerNextButton) {
+function buildReaderCta() {
+  const cta = document.createElement("div");
+  cta.className = "reader-dialog__cta";
+
+  const title = document.createElement("p");
+  title.className = "reader-dialog__cta-title";
+  title.textContent = "Хотите узнать, что будет дальше?";
+
+  const text = document.createElement("p");
+  text.className = "reader-dialog__cta-text";
+  text.textContent = "Скачайте книгу целиком — бесплатно, в удобном формате.";
+
+  const grid = document.createElement("div");
+  grid.className = "reader-dialog__cta-grid";
+
+  $$(".about-panel__format-card").forEach((card) => {
+    grid.appendChild(card.cloneNode(true));
+  });
+
+  cta.append(title, text, grid);
+  return cta;
+}
+
+function renderReaderPage(index, { animate = true } = {}) {
+  if (!reader.content || !readerPageElement) {
     return;
   }
 
-  const page = readerContent.pages[index];
+  const { pages } = reader.content;
+  const page = pages[index];
 
   if (!page) {
     return;
   }
 
+  const paragraphs = page.paragraphs.map((paragraphText) => {
+    const paragraph = document.createElement("p");
+    paragraph.textContent = paragraphText;
+    return paragraph;
+  });
+
+  readerPageElement.replaceChildren(...paragraphs);
+
+  if (index === pages.length - 1) {
+    readerPageElement.appendChild(buildReaderCta());
+  }
+
   readerPageElement.classList.remove("is-transitioning");
-  void readerPageElement.offsetWidth;
-  readerPageElement.classList.add("is-transitioning");
-  readerPageElement.innerHTML = page.paragraphs
-    .map((paragraph) => `<p>${paragraph}</p>`)
-    .join("");
+
+  if (animate && !reduceMotion) {
+    void readerPageElement.offsetWidth;
+    readerPageElement.classList.add("is-transitioning");
+  }
+
   readerPageElement.scrollTop = 0;
 
-  const totalPages = readerContent.pages.length;
-  readerMetaElement.textContent = `${index + 1} / ${totalPages}`;
-  readerPrevButton.hidden = index === 0;
-  readerNextButton.hidden = index === totalPages - 1;
+  if (readerMetaElement) {
+    readerMetaElement.textContent = `${index + 1} / ${pages.length}`;
+  }
+
+  if (readerProgressElement) {
+    readerProgressElement.style.width = `${((index + 1) / pages.length) * 100}%`;
+  }
+
+  const focusedButton = document.activeElement;
+
+  if (readerPrevButton) {
+    readerPrevButton.hidden = index === 0;
+  }
+
+  if (readerNextButton) {
+    readerNextButton.hidden = index === pages.length - 1;
+  }
+
+  // Если кнопка, на которой стоял фокус, исчезла — переводим фокус на текст.
+  if (focusedButton instanceof HTMLElement && focusedButton.hidden) {
+    readerPageElement.focus({ preventScroll: true });
+  }
+
+  hideShareButton();
+  store.set("localStorage", READER_PAGE_KEY, index);
 }
 
-function trapReaderFocus(event) {
-  if (!isReaderOpen || event.key !== "Tab" || !readerDialogElement) {
+function changeReaderPage(direction) {
+  if (!reader.content) {
     return;
   }
 
-  const focusableElements = Array.from(
-    readerDialogElement.querySelectorAll(READER_FOCUSABLE_SELECTOR)
-  ).filter((element) => !element.hasAttribute("hidden"));
+  const nextIndex = reader.pageIndex + direction;
 
-  if (!focusableElements.length) {
+  if (nextIndex < 0 || nextIndex >= reader.content.pages.length) {
     return;
   }
 
-  const firstElement = focusableElements[0];
-  const lastElement = focusableElements[focusableElements.length - 1];
+  reader.pageIndex = nextIndex;
+  renderReaderPage(reader.pageIndex);
+}
 
-  if (event.shiftKey && document.activeElement === firstElement) {
-    event.preventDefault();
-    lastElement.focus();
-    return;
+function applyReaderFontStep() {
+  readerDialog?.style.setProperty("--reader-font-scale", String(1 + reader.fontStep * 0.1));
+
+  readerFontButtons.forEach((button) => {
+    const direction = Number(button.dataset.readerFont);
+    button.disabled =
+      (direction < 0 && reader.fontStep <= READER_FONT_MIN) ||
+      (direction > 0 && reader.fontStep >= READER_FONT_MAX);
+  });
+}
+
+function changeReaderFont(direction) {
+  reader.fontStep = clampNumber(reader.fontStep + direction, READER_FONT_MIN, READER_FONT_MAX);
+  store.set("localStorage", READER_FONT_KEY, reader.fontStep);
+  applyReaderFontStep();
+}
+
+function isElementInViewport(element) {
+  if (!element) {
+    return false;
   }
 
-  if (!event.shiftKey && document.activeElement === lastElement) {
-    event.preventDefault();
-    firstElement.focus();
+  const rect = element.getBoundingClientRect();
+  return rect.bottom > 0 && rect.top < window.innerHeight && rect.width > 0;
+}
+
+function canMorphFromBook() {
+  return (
+    typeof document.startViewTransition === "function" &&
+    !reduceMotion &&
+    isElementInViewport(readerOriginImage)
+  );
+}
+
+function setMorphNames(phase) {
+  // Одно и то же имя не может быть у двух элементов одновременно.
+  if (readerOriginImage) {
+    readerOriginImage.style.viewTransitionName = phase === "book" ? "reader-sheet" : "";
+  }
+
+  if (readerSheet) {
+    readerSheet.style.viewTransitionName = phase === "sheet" ? "reader-sheet" : "";
   }
 }
 
-function handleReaderKeydown(event) {
-  if (!isReaderOpen) {
-    return;
-  }
-
-  if (event.key === "Escape") {
-    event.preventDefault();
-    closeReader();
-    return;
-  }
-
-  if (event.key === "ArrowRight" && !readerNextButton?.hidden) {
-    event.preventDefault();
-    changeReaderPage(1);
-    return;
-  }
-
-  if (event.key === "ArrowLeft" && !readerPrevButton?.hidden) {
-    event.preventDefault();
-    changeReaderPage(-1);
-    return;
-  }
-
-  trapReaderFocus(event);
+function showReaderModal() {
+  readerDialog.showModal();
+  document.body.classList.add("reader-open");
+  // showModal() сам ставит фокус на первую кнопку — переводим его на текст.
+  readerPageElement?.focus({ preventScroll: true });
 }
 
-async function openReader() {
-  if (isReaderOpen || !readerLayerElement || !readerDialogElement) {
+function showReaderInstantly() {
+  readerDialog.classList.add("is-instant", "is-open");
+  showReaderModal();
+}
+
+function finishReaderClose() {
+  if (reader.closeTimeoutId !== null) {
+    window.clearTimeout(reader.closeTimeoutId);
+    reader.closeTimeoutId = null;
+  }
+
+  readerDialog.classList.remove("is-open", "is-closing", "is-instant");
+
+  if (readerDialog.open) {
+    readerDialog.close();
+  }
+
+  document.body.classList.remove("reader-open");
+  hideShareButton();
+
+  if (reader.lastTrigger instanceof HTMLElement && reader.lastTrigger.isConnected) {
+    reader.lastTrigger.focus({ preventScroll: true });
+  }
+}
+
+async function openReader(trigger) {
+  if (!readerDialog || reader.opening) {
     return;
   }
 
-  lastReaderTrigger = document.activeElement instanceof HTMLElement
-    ? document.activeElement
-    : readerTriggerElement;
+  // Повторное открытие во время анимации закрытия — просто отменяем закрытие.
+  if (reader.closeTimeoutId !== null) {
+    window.clearTimeout(reader.closeTimeoutId);
+    reader.closeTimeoutId = null;
+    readerDialog.classList.remove("is-closing");
+    readerDialog.classList.add("is-open");
+    return;
+  }
+
+  reader.opening = true;
+
+  // Если идёт морфинг закрытия, дожидаемся, пока окно закроется, и открываем заново.
+  if (reader.closingTransition) {
+    await reader.closingTransition.updateCallbackDone.catch(() => {});
+  }
+
+  if (readerDialog.open) {
+    reader.opening = false;
+    return;
+  }
+
+  reader.lastTrigger = trigger instanceof HTMLElement ? trigger : document.activeElement;
+  trigger?.setAttribute("aria-busy", "true");
 
   try {
     await loadReaderContent();
   } catch {
+    showToast("Не удалось загрузить фрагмент. Проверьте соединение и попробуйте ещё раз.");
     return;
+  } finally {
+    reader.opening = false;
+    trigger?.removeAttribute("aria-busy");
   }
 
-  currentReaderPageIndex = 0;
-  renderReaderPage(currentReaderPageIndex);
-  isReaderOpen = true;
-  document.body.classList.add("reader-open");
-  readerLayerElement.setAttribute("aria-hidden", "false");
-  readerLayerElement.classList.remove("is-closing");
-  readerLayerElement.classList.add("is-open");
-  document.addEventListener("keydown", handleReaderKeydown);
-  trackEvent("fragment_open");
+  const savedPage = Number(store.get("localStorage", READER_PAGE_KEY));
+  reader.pageIndex = Number.isInteger(savedPage)
+    ? clampNumber(savedPage, 0, reader.content.pages.length - 1)
+    : 0;
 
-  window.setTimeout(() => {
-    readerDialogElement.focus();
-  }, 40);
+  renderReaderPage(reader.pageIndex, { animate: false });
+  applyReaderFontStep();
+  trackEvent("fragment_open", { page: reader.pageIndex + 1 });
+
+  if (canMorphFromBook()) {
+    setMorphNames("book");
+    const transition = document.startViewTransition(() => {
+      setMorphNames("sheet");
+      showReaderInstantly();
+    });
+
+    transition.finished.finally(() => {
+      setMorphNames("none");
+      readerDialog.classList.remove("is-instant");
+    });
+  } else if (reduceMotion) {
+    showReaderInstantly();
+  } else {
+    showReaderModal();
+    // Следующий кадр, чтобы сработал CSS-переход из закрытого состояния.
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => readerDialog.classList.add("is-open"));
+    });
+  }
 }
 
 function closeReader() {
-  if (!isReaderOpen || !readerLayerElement) {
+  if (!readerDialog?.open || reader.closeTimeoutId !== null) {
     return;
   }
 
-  isReaderOpen = false;
-  trackEvent("fragment_close");
-  document.removeEventListener("keydown", handleReaderKeydown);
-  readerLayerElement.classList.add("is-closing");
-  readerLayerElement.classList.remove("is-open");
+  trackEvent("fragment_close", { page: reader.pageIndex + 1 });
+  hideShareButton();
 
-  window.setTimeout(() => {
-    readerLayerElement.setAttribute("aria-hidden", "true");
-    readerLayerElement.classList.remove("is-closing");
-    document.body.classList.remove("reader-open");
+  if (canMorphFromBook()) {
+    setMorphNames("sheet");
+    const transition = document.startViewTransition(() => {
+      setMorphNames("book");
+      finishReaderClose();
+    });
 
-    if (lastReaderTrigger instanceof HTMLElement) {
-      lastReaderTrigger.focus();
+    reader.closingTransition = transition;
+    transition.finished.finally(() => {
+      setMorphNames("none");
+      reader.closingTransition = null;
+    });
+    return;
+  }
+
+  if (reduceMotion) {
+    finishReaderClose();
+    return;
+  }
+
+  readerDialog.classList.remove("is-instant", "is-open");
+  readerDialog.classList.add("is-closing");
+  reader.closeTimeoutId = window.setTimeout(finishReaderClose, READER_CLOSE_DURATION_MS);
+}
+
+/* --- Цитаты --- */
+
+function hideShareButton() {
+  reader.selectedQuote = "";
+
+  if (readerShareButton) {
+    readerShareButton.hidden = true;
+  }
+}
+
+function handleSelectionChange() {
+  if (!readerDialog?.open || !readerShareButton || !readerPageElement) {
+    return;
+  }
+
+  const selection = window.getSelection();
+  const text = selection?.toString().replace(/\s+/g, " ").trim() ?? "";
+  const isInsideReader =
+    selection?.rangeCount &&
+    readerPageElement.contains(selection.getRangeAt(0).commonAncestorContainer);
+
+  if (isInsideReader && text.length >= QUOTE_MIN_LENGTH && text.length <= QUOTE_MAX_LENGTH) {
+    reader.selectedQuote = text;
+    readerShareButton.hidden = false;
+    return;
+  }
+
+  // Клик по самой кнопке может сбросить выделение — не прячем её в этот момент.
+  if (document.activeElement !== readerShareButton) {
+    hideShareButton();
+  }
+}
+
+function wrapCanvasText(context, text, maxWidth) {
+  const words = text.split(" ");
+  const lines = [];
+  let line = "";
+
+  words.forEach((word) => {
+    const candidate = line ? `${line} ${word}` : word;
+
+    if (context.measureText(candidate).width > maxWidth && line) {
+      lines.push(line);
+      line = word;
+    } else {
+      line = candidate;
     }
-  }, READER_CLOSE_DURATION_MS);
+  });
+
+  if (line) {
+    lines.push(line);
+  }
+
+  return lines;
 }
 
-function changeReaderPage(direction) {
-  if (!readerContent) {
+async function renderQuoteCard(quote) {
+  const width = 1080;
+  const height = 1350;
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext("2d");
+
+  try {
+    await Promise.all([
+      document.fonts.load('500 56px "Cormorant Garamond"'),
+      document.fonts.load('400 48px "Forum"')
+    ]);
+  } catch {
+    /* без веб-шрифтов карточка нарисуется системным serif */
+  }
+
+  const background = context.createLinearGradient(0, 0, 0, height);
+  background.addColorStop(0, "#0d0b09");
+  background.addColorStop(1, "#040404");
+  context.fillStyle = background;
+  context.fillRect(0, 0, width, height);
+
+  const glow = context.createRadialGradient(width / 2, height * 0.86, 0, width / 2, height * 0.86, width * 0.7);
+  glow.addColorStop(0, "rgba(255, 150, 60, 0.18)");
+  glow.addColorStop(1, "rgba(255, 150, 60, 0)");
+  context.fillStyle = glow;
+  context.fillRect(0, 0, width, height);
+
+  context.strokeStyle = "rgba(183, 146, 98, 0.45)";
+  context.lineWidth = 2;
+  context.strokeRect(60, 60, width - 120, height - 120);
+
+  const maxTextWidth = width - 260;
+  let fontSize = 60;
+  let lines = [];
+
+  do {
+    context.font = `500 ${fontSize}px "Cormorant Garamond", Georgia, serif`;
+    lines = wrapCanvasText(context, `«${quote}»`, maxTextWidth);
+    fontSize -= 4;
+  } while (lines.length * fontSize * 1.45 > height * 0.55 && fontSize > 32);
+
+  fontSize += 4;
+  const lineHeight = fontSize * 1.45;
+  const blockHeight = lines.length * lineHeight;
+  let y = (height - blockHeight) / 2 - 40;
+
+  context.fillStyle = "#dfd2bf";
+  context.textAlign = "center";
+  context.textBaseline = "top";
+  lines.forEach((line) => {
+    context.fillText(line, width / 2, y);
+    y += lineHeight;
+  });
+
+  context.fillStyle = "rgba(183, 146, 98, 0.7)";
+  context.fillRect(width / 2 - 90, height - 330, 180, 2);
+
+  context.fillStyle = "#b79262";
+  context.font = '400 52px "Forum", Georgia, serif';
+  context.fillText("МЕЧТА. 9:59", width / 2, height - 290);
+
+  context.fillStyle = "rgba(223, 210, 191, 0.78)";
+  context.font = '500 36px "Cormorant Garamond", Georgia, serif';
+  context.fillText("Тимофей Бородич", width / 2, height - 220);
+
+  context.fillStyle = "rgba(223, 210, 191, 0.5)";
+  context.font = '500 30px "Cormorant Garamond", Georgia, serif';
+  context.fillText("9-59.site", width / 2, height - 160);
+
+  return new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+}
+
+function downloadBlob(blob, fileName) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+
+async function shareQuote() {
+  const quote = reader.selectedQuote;
+
+  if (!quote) {
     return;
   }
 
-  const nextIndex = currentReaderPageIndex + direction;
+  const text = `«${quote}» — Тимофей Бородич, «Мечта. 9:59»`;
+  const shareData = { title: "«Мечта. 9:59»", text, url: SITE_URL };
+  trackEvent("quote_share", { length: quote.length });
 
-  if (nextIndex < 0 || nextIndex >= readerContent.pages.length) {
+  try {
+    const blob = await renderQuoteCard(quote);
+    const file = blob ? new File([blob], "mechta-9-59-quote.png", { type: "image/png" }) : null;
+
+    if (file && navigator.canShare?.({ files: [file] })) {
+      await navigator.share({ ...shareData, files: [file] });
+    } else if (typeof navigator.share === "function") {
+      await navigator.share(shareData);
+    } else {
+      if (blob) {
+        downloadBlob(blob, "mechta-9-59-quote.png");
+      }
+
+      let copied = false;
+
+      try {
+        await navigator.clipboard?.writeText(`${text}\n${SITE_URL}`);
+        copied = Boolean(navigator.clipboard);
+      } catch {
+        copied = false;
+      }
+
+      showToast(copied ? "Цитата скопирована, карточка сохранена" : "Карточка с цитатой сохранена");
+    }
+  } catch (error) {
+    if (error?.name !== "AbortError") {
+      showToast("Не получилось поделиться цитатой");
+    }
+  }
+
+  hideShareButton();
+  window.getSelection()?.removeAllRanges();
+}
+
+function initializeReader() {
+  if (!readerDialog) {
     return;
   }
 
-  currentReaderPageIndex = nextIndex;
-  renderReaderPage(currentReaderPageIndex);
+  $$("[data-close-reader]", readerDialog).forEach((element) => {
+    element.addEventListener("click", closeReader);
+  });
+
+  readerPrevButton?.addEventListener("click", () => changeReaderPage(-1));
+  readerNextButton?.addEventListener("click", () => changeReaderPage(1));
+
+  readerFontButtons.forEach((button) => {
+    button.addEventListener("click", () => changeReaderFont(Number(button.dataset.readerFont)));
+  });
+
+  // Esc: вместо мгновенного закрытия — анимированное.
+  readerDialog.addEventListener("cancel", (event) => {
+    event.preventDefault();
+    closeReader();
+  });
+
+  // Диалог мог закрыться в обход closeReader (например, двойной Esc) — приводим состояние в порядок.
+  readerDialog.addEventListener("close", () => {
+    if (readerDialog.classList.contains("is-open") || document.body.classList.contains("reader-open")) {
+      finishReaderClose();
+    }
+  });
+
+  readerDialog.addEventListener("keydown", (event) => {
+    if (event.target instanceof HTMLElement && event.target.closest("input, textarea")) {
+      return;
+    }
+
+    if (event.key === "ArrowRight" && readerNextButton && !readerNextButton.hidden) {
+      event.preventDefault();
+      changeReaderPage(1);
+    } else if (event.key === "ArrowLeft" && readerPrevButton && !readerPrevButton.hidden) {
+      event.preventDefault();
+      changeReaderPage(-1);
+    }
+  });
+
+  if (readerShareButton) {
+    // Не даём клику по кнопке сбросить выделенный текст.
+    readerShareButton.addEventListener("pointerdown", (event) => event.preventDefault());
+    readerShareButton.addEventListener("click", () => {
+      void shareQuote();
+    });
+  }
+
+  document.addEventListener("selectionchange", handleSelectionChange);
+  applyReaderFontStep();
 }
 
-function getRemainingSeconds(endTime) {
-  const remainingMs = Math.max(0, endTime - Date.now());
+/* ------------------------------------------------------------------ */
+/* Делегированные клики                                                 */
+/* ------------------------------------------------------------------ */
 
-  return Math.ceil(remainingMs / 1000);
-}
+document.addEventListener("click", (event) => {
+  if (!(event.target instanceof Element)) {
+    return;
+  }
+
+  const download = event.target.closest("[data-analytics-event]");
+
+  if (download instanceof HTMLElement) {
+    trackEvent(download.dataset.analyticsEvent, {
+      file_type: download.dataset.analyticsFileType,
+      placement: download.closest(".reader-dialog") ? "reader" : "page"
+    });
+  }
+
+  const contact = event.target.closest("[data-analytics-contact-type]");
+
+  if (contact instanceof HTMLElement) {
+    trackEvent("author_contact_click", { contact_type: contact.dataset.analyticsContactType });
+  }
+
+  const opener = event.target.closest("[data-open-reader]");
+
+  if (opener instanceof HTMLElement) {
+    event.preventDefault();
+    void openReader(opener);
+  }
+});
+
+/* ------------------------------------------------------------------ */
+/* Аудио                                                               */
+/* ------------------------------------------------------------------ */
+
+const audioState = {
+  initialized: false,
+  ambientStarted: false,
+  ambientPausedByVisibility: false,
+  isHowlPlaying: false,
+  interactionHandler: null,
+  fadeFrameId: null,
+  fadeResolve: null,
+  clock: null,
+  dogHowl: null,
+  music: null,
+  missing: new Set()
+};
+
+// click нужен для тач-устройств: pointerdown там не даёт разрешения на звук.
+const AUTOPLAY_RETRY_EVENTS = ["pointerdown", "click", "keydown"];
 
 function resolveAudioSource(key) {
-  const sourceSet = AUDIO_SOURCES[key];
+  const sources = AUDIO_SOURCES[key];
 
-  if (!sourceSet) {
+  if (!sources) {
     return "";
   }
 
-  if (sourceSet.opus && AUDIO_CAPABILITIES.opus) {
-    return sourceSet.opus;
-  }
-
-  return sourceSet.mp3 ?? "";
+  return sources.opus && CAN_PLAY_OPUS ? sources.opus : sources.mp3 ?? "";
 }
 
-function createAudioElement(key, volume, options = {}) {
+function createAudio(key, volume, { loop = false, preload = "none", assignSource = true } = {}) {
   const audio = new Audio();
-
-  audio.preload = options.preload ?? "none";
-  audio.loop = Boolean(options.loop);
+  audio.preload = preload;
+  audio.loop = loop;
   audio.volume = volume;
-  audio.crossOrigin = "anonymous";
-  audio.dataset.audioKey = key;
 
-  if (options.assignSource) {
+  if (assignSource) {
     audio.src = resolveAudioSource(key);
   }
+
+  audio.addEventListener("error", () => {
+    audioState.missing.add(key);
+  });
 
   return audio;
 }
 
-function requestAudioLoad(audio, key, preload = "metadata") {
-  if (!audio || audioState.loadRequested[key]) {
+function ensureAudioSource(audio, key, preload = "auto") {
+  if (!audio || audio.getAttribute("src")) {
     return;
   }
 
-  const source = resolveAudioSource(key);
-
-  if (!source) {
-    audioState.availability[key] = "missing";
-    return;
-  }
-
-  if (audio.src !== source) {
-    audio.src = source;
-  }
-
+  audio.src = resolveAudioSource(key);
   audio.preload = preload;
   audio.load();
-  audioState.loadRequested[key] = true;
 }
 
-function attachAvailabilityTracking(audio, key) {
-  if (!audio) {
+function initializeAudio() {
+  if (audioState.initialized) {
     return;
   }
 
-  audio.addEventListener("canplaythrough", () => {
-    audioState.availability[key] = "ready";
+  audioState.clock = createAudio("clock", AUDIO_VOLUME.clock, { loop: true });
+  audioState.dogHowl = createAudio("dogHowl", AUDIO_VOLUME.dogHowl, { preload: "auto" });
+  audioState.music = createAudio("bookTrack", 0, { assignSource: false });
+
+  audioState.music.addEventListener("ended", () => {
+    setTrackUi("paused");
+    updateMediaSessionState("paused");
   });
 
-  audio.addEventListener("loadeddata", () => {
-    if (audioState.availability[key] !== "missing") {
-      audioState.availability[key] = "ready";
-    }
-  });
-
-  audio.addEventListener("error", () => {
-    audioState.availability[key] = "missing";
-  });
+  bindAutoplayRetryHandlers();
+  setTrackUi("idle");
+  audioState.initialized = true;
 }
 
 function bindAutoplayRetryHandlers() {
-  if (audioState.interactionHandlersBound) {
+  if (audioState.interactionHandler) {
     return;
   }
 
-  const retryHandler = () => {
-    void tryStartAmbientAudio();
+  audioState.interactionHandler = () => {
+    void startAmbientAudio();
   };
 
-  audioState.firstUserInteractionHandler = retryHandler;
-  audioState.interactionHandlersBound = true;
-
-  ["pointerdown", "click", "touchstart", "keydown"].forEach((eventName) => {
-    document.addEventListener(eventName, retryHandler, { passive: true });
+  AUTOPLAY_RETRY_EVENTS.forEach((eventName) => {
+    document.addEventListener(eventName, audioState.interactionHandler, { passive: true });
   });
 }
 
 function removeAutoplayRetryHandlers() {
-  if (!audioState.interactionHandlersBound || !audioState.firstUserInteractionHandler) {
+  if (!audioState.interactionHandler) {
     return;
   }
 
-  ["pointerdown", "click", "touchstart", "keydown"].forEach((eventName) => {
-    document.removeEventListener(eventName, audioState.firstUserInteractionHandler, { passive: true });
+  AUTOPLAY_RETRY_EVENTS.forEach((eventName) => {
+    document.removeEventListener(eventName, audioState.interactionHandler, { passive: true });
   });
 
-  audioState.firstUserInteractionHandler = null;
-  audioState.interactionHandlersBound = false;
+  audioState.interactionHandler = null;
 }
 
-function updateTrackButton(isPlaying) {
+async function startAmbientAudio() {
+  initializeAudio();
+
+  if (audioState.ambientStarted || document.hidden) {
+    return audioState.ambientStarted;
+  }
+
+  if (audioState.missing.has("clock")) {
+    audioState.ambientStarted = true;
+    removeAutoplayRetryHandlers();
+    return true;
+  }
+
+  try {
+    await audioState.clock.play();
+    audioState.ambientStarted = true;
+    removeAutoplayRetryHandlers();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function fadeAudio(audio, targetVolume, durationMs) {
+  if (audioState.fadeFrameId !== null) {
+    window.cancelAnimationFrame(audioState.fadeFrameId);
+    audioState.fadeFrameId = null;
+  }
+
+  // Завершаем предыдущее затухание, чтобы его промис не «висел».
+  audioState.fadeResolve?.();
+  audioState.fadeResolve = null;
+
+  if (!audio) {
+    return Promise.resolve();
+  }
+
+  const startVolume = audio.volume;
+  const startTime = performance.now();
+
+  return new Promise((resolve) => {
+    audioState.fadeResolve = resolve;
+
+    const step = (now) => {
+      const progress = Math.min(1, (now - startTime) / durationMs);
+      audio.volume = startVolume + (targetVolume - startVolume) * progress;
+
+      if (progress < 1) {
+        audioState.fadeFrameId = window.requestAnimationFrame(step);
+        return;
+      }
+
+      audioState.fadeFrameId = null;
+      audioState.fadeResolve = null;
+      resolve();
+    };
+
+    audioState.fadeFrameId = window.requestAnimationFrame(step);
+  });
+}
+
+function setTrackUi(state) {
   if (!atmosphereButton) {
     return;
   }
 
-  atmosphereButton.textContent = isPlaying ? "Выключить трек" : "Включить трек";
-  atmosphereButton.setAttribute("aria-pressed", String(isPlaying));
-}
-
-function setTrackButtonState(state) {
-  if (!atmosphereButton) {
-    return;
-  }
-
+  const isPlaying = state === "playing";
   atmosphereButton.dataset.trackState = state;
   atmosphereButton.disabled = state === "loading";
   atmosphereButton.setAttribute("aria-busy", String(state === "loading"));
+  atmosphereButton.setAttribute("aria-pressed", String(isPlaying));
+  atmosphereButton.textContent = isPlaying ? "Выключить трек" : "Включить трек";
 }
 
-function resetDogMinuteEvents() {
-  howledMinutes.clear();
+async function playTrack() {
+  initializeAudio();
+  const music = audioState.music;
+
+  if (audioState.missing.has("bookTrack")) {
+    setTrackUi("error");
+    return;
+  }
+
+  if (!music.paused) {
+    return;
+  }
+
+  setTrackUi("loading");
+  void startAmbientAudio();
+  ensureAudioSource(music, "bookTrack");
+  music.volume = 0;
+
+  try {
+    await music.play();
+  } catch {
+    setTrackUi("error");
+    return;
+  }
+
+  trackEvent("music_play");
+  setTrackUi("playing");
+  setupMediaSession();
+  updateMediaSessionState("playing");
+  await fadeAudio(music, AUDIO_VOLUME.bookTrack, MUSIC_FADE_DURATION_MS);
 }
+
+async function pauseTrack({ fade = true } = {}) {
+  const music = audioState.music;
+
+  if (!music || music.paused) {
+    return;
+  }
+
+  setTrackUi("pausing");
+
+  if (fade) {
+    await fadeAudio(music, 0, MUSIC_FADE_DURATION_MS);
+  }
+
+  music.pause();
+  trackEvent("music_pause");
+  setTrackUi("paused");
+  updateMediaSessionState("paused");
+}
+
+function toggleBookTrack() {
+  initializeAudio();
+
+  if (audioState.music.paused) {
+    void playTrack();
+  } else {
+    void pauseTrack();
+  }
+}
+
+/* --- Media Session: обложка и управление на экране блокировки --- */
+
+let mediaSessionReady = false;
+
+function setupMediaSession() {
+  if (mediaSessionReady || !("mediaSession" in navigator) || typeof window.MediaMetadata !== "function") {
+    return;
+  }
+
+  navigator.mediaSession.metadata = new window.MediaMetadata({
+    title: "Трек книги «Мечта. 9:59»",
+    artist: "Тимофей Бородич",
+    album: "Мечта. 9:59",
+    artwork: [
+      { src: "assets/images/icon-192.png", sizes: "192x192", type: "image/png" },
+      { src: "assets/images/icon-512.png", sizes: "512x512", type: "image/png" },
+      { src: "assets/images/book-cover-current.jpg", sizes: "853x1280", type: "image/jpeg" }
+    ]
+  });
+
+  const handlers = {
+    play: () => void playTrack(),
+    pause: () => void pauseTrack({ fade: false }),
+    stop: () => void pauseTrack({ fade: false })
+  };
+
+  Object.entries(handlers).forEach(([action, handler]) => {
+    try {
+      navigator.mediaSession.setActionHandler(action, handler);
+    } catch {
+      /* действие не поддерживается этим браузером */
+    }
+  });
+
+  mediaSessionReady = true;
+}
+
+function updateMediaSessionState(state) {
+  if ("mediaSession" in navigator) {
+    navigator.mediaSession.playbackState = state;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Огонь, искры, собака                                                 */
+/* ------------------------------------------------------------------ */
+
+let sparkTimeoutId = null;
+let sparkElements = [];
+let isDogAnimating = false;
+let isHeroVisible = true;
 
 function initializeFireAnimation() {
   if (!heroElement || heroElement.dataset.fireAnimationInitialized === "true") {
@@ -588,18 +1188,14 @@ function initializeFireAnimation() {
   heroElement.dataset.fireAnimationInitialized = "true";
   heroElement.classList.add("hero--fire-active");
   initializeSparks();
-
-  if (!document.hidden) {
-    scheduleNextSparkBurst();
-  }
+  scheduleNextSparkBurst();
 }
 
 function initializeSparks() {
-  if (!sparkPoolElement || sparkPoolElement.dataset.sparkPoolInitialized === "true") {
+  if (!sparkPoolElement || sparkElements.length) {
     return;
   }
 
-  sparkPoolElement.dataset.sparkPoolInitialized = "true";
   sparkElements = Array.from({ length: SPARK_POOL_SIZE }, () => {
     const spark = document.createElement("span");
     spark.className = "hero__spark";
@@ -612,19 +1208,31 @@ function initializeSparks() {
   });
 }
 
+function canPlaySparks() {
+  return (
+    heroElement?.dataset.fireAnimationInitialized === "true" &&
+    !document.hidden &&
+    !reduceMotion &&
+    isHeroVisible
+  );
+}
+
+function cancelScheduledSparks() {
+  if (sparkTimeoutId !== null) {
+    window.clearTimeout(sparkTimeoutId);
+    sparkTimeoutId = null;
+  }
+}
+
 function scheduleNextSparkBurst() {
-  if (
-    heroElement?.dataset.fireAnimationInitialized !== "true" ||
-    document.hidden
-  ) {
+  cancelScheduledSparks();
+
+  if (!canPlaySparks()) {
     return;
   }
 
-  cancelScheduledSparks();
-
   const delay =
-    SPARK_BURST_MIN_DELAY_MS +
-    Math.random() * (SPARK_BURST_MAX_DELAY_MS - SPARK_BURST_MIN_DELAY_MS);
+    SPARK_BURST_MIN_DELAY_MS + Math.random() * (SPARK_BURST_MAX_DELAY_MS - SPARK_BURST_MIN_DELAY_MS);
 
   sparkTimeoutId = window.setTimeout(() => {
     playSparkBurst();
@@ -633,17 +1241,13 @@ function scheduleNextSparkBurst() {
 }
 
 function playSparkBurst() {
-  if (!sparkElements.length || document.hidden) {
+  if (!sparkElements.length || !canPlaySparks()) {
     return;
   }
 
   const availableSparks = sparkElements.filter(
     (spark) => !spark.classList.contains("hero__spark--active")
   );
-
-  if (!availableSparks.length) {
-    return;
-  }
 
   const sparkCount = Math.min(
     availableSparks.length,
@@ -655,228 +1259,22 @@ function playSparkBurst() {
     .sort(() => Math.random() - 0.5)
     .slice(0, sparkCount)
     .forEach((spark) => {
-      const size = 0.2 + Math.random() * 0.18;
-      const left = 34 + Math.random() * 32;
-      const bottom = 10 + Math.random() * 18;
-      const driftX = -0.4 + Math.random() * 0.8;
-      const rise = -(1.1 + Math.random() * 1.4);
       const duration =
-        SPARK_DURATION_MIN_MS +
-        Math.random() * (SPARK_DURATION_MAX_MS - SPARK_DURATION_MIN_MS);
+        SPARK_DURATION_MIN_MS + Math.random() * (SPARK_DURATION_MAX_MS - SPARK_DURATION_MIN_MS);
 
-      spark.classList.remove("hero__spark--active");
-      spark.style.setProperty("--spark-size", `${size}rem`);
-      spark.style.setProperty("--spark-left", `${left}%`);
-      spark.style.setProperty("--spark-bottom", `${bottom}%`);
-      spark.style.setProperty("--spark-drift-x", `${driftX.toFixed(2)}rem`);
-      spark.style.setProperty("--spark-rise", `${rise.toFixed(2)}rem`);
+      spark.style.setProperty("--spark-size", `${0.2 + Math.random() * 0.18}rem`);
+      spark.style.setProperty("--spark-left", `${34 + Math.random() * 32}%`);
+      spark.style.setProperty("--spark-bottom", `${10 + Math.random() * 18}%`);
+      spark.style.setProperty("--spark-drift-x", `${(-0.4 + Math.random() * 0.8).toFixed(2)}rem`);
+      spark.style.setProperty("--spark-rise", `${(-(1.1 + Math.random() * 1.4)).toFixed(2)}rem`);
       spark.style.setProperty("--spark-duration", `${duration.toFixed(0)}ms`);
       void spark.offsetWidth;
       spark.classList.add("hero__spark--active");
+
+      // Страховка: если анимация не запустилась (например, отключена в CSS),
+      // искра не должна навсегда выпасть из пула.
+      window.setTimeout(() => spark.classList.remove("hero__spark--active"), duration + 200);
     });
-}
-
-function cancelScheduledSparks() {
-  if (sparkTimeoutId !== null) {
-    window.clearTimeout(sparkTimeoutId);
-    sparkTimeoutId = null;
-  }
-}
-
-async function initializeAudio() {
-  if (audioState.initialized) {
-    return audioState;
-  }
-
-  audioState.ambience.fireplace = createAudioElement(
-    "fireplace",
-    AUDIO_VOLUME.fireplace,
-    { loop: true, preload: "none", assignSource: true }
-  );
-  audioState.ambience.clock = createAudioElement(
-    "clock",
-    AUDIO_VOLUME.clock,
-    { loop: true, preload: "none", assignSource: true }
-  );
-  audioState.effects.dogHowl = createAudioElement(
-    "dogHowl",
-    AUDIO_VOLUME.dogHowl,
-    { preload: "auto", assignSource: true }
-  );
-  audioState.music = createAudioElement(
-    "bookTrack",
-    0,
-    { loop: false, preload: "none" }
-  );
-
-  attachAvailabilityTracking(audioState.ambience.fireplace, "fireplace");
-  attachAvailabilityTracking(audioState.ambience.clock, "clock");
-  attachAvailabilityTracking(audioState.effects.dogHowl, "dogHowl");
-  attachAvailabilityTracking(audioState.music, "bookTrack");
-
-  requestAudioLoad(audioState.effects.dogHowl, "dogHowl", "auto");
-
-  bindAutoplayRetryHandlers();
-  updateTrackButton(false);
-  setTrackButtonState("idle");
-  audioState.initialized = true;
-
-  return audioState;
-}
-
-function getPlayableAmbientAudio() {
-  const pairs = [
-    ["fireplace", audioState.ambience.fireplace],
-    ["clock", audioState.ambience.clock]
-  ];
-
-  return pairs
-    .filter(([key, audio]) => audio && audioState.availability[key] !== "missing")
-    .map(([, audio]) => audio);
-}
-
-async function startAmbientAudio() {
-  requestAudioLoad(audioState.ambience.fireplace, "fireplace", "auto");
-  requestAudioLoad(audioState.ambience.clock, "clock", "auto");
-
-  const playableAudio = getPlayableAmbientAudio();
-
-  if (playableAudio.length === 0) {
-    audioState.ambientStarted = true;
-    removeAutoplayRetryHandlers();
-    return true;
-  }
-
-  const playResults = await Promise.allSettled(
-    playableAudio.map((audio) => {
-      if (!audio.paused) {
-        return Promise.resolve();
-      }
-
-      return audio.play();
-    })
-  );
-
-  const allStarted = playResults.every((result) => result.status === "fulfilled");
-
-  if (allStarted) {
-    audioState.ambientStarted = true;
-    removeAutoplayRetryHandlers();
-  }
-
-  return allStarted;
-}
-
-async function tryStartAmbientAudio() {
-  await initializeAudio();
-
-  if (audioState.ambientStarted) {
-    return true;
-  }
-
-  try {
-    return await startAmbientAudio();
-  } catch {
-    return false;
-  }
-}
-
-function stopAmbientAudio() {
-  [audioState.ambience.fireplace, audioState.ambience.clock].forEach((audio) => {
-    if (!audio) {
-      return;
-    }
-
-    audio.pause();
-    audio.currentTime = 0;
-  });
-
-  if (audioState.effects.dogHowl) {
-    audioState.effects.dogHowl.pause();
-    audioState.effects.dogHowl.currentTime = 0;
-  }
-
-  audioState.isHowlPlaying = false;
-  audioState.ambientStarted = false;
-}
-
-function fadeAudio(audio, targetVolume, durationMs) {
-  if (!audio) {
-    return Promise.resolve();
-  }
-
-  if (audioState.fadeFrameId !== null) {
-    window.cancelAnimationFrame(audioState.fadeFrameId);
-    audioState.fadeFrameId = null;
-  }
-
-  const startVolume = audio.volume;
-  const startTime = performance.now();
-
-  return new Promise((resolve) => {
-    function step(now) {
-      const progress = Math.min(1, (now - startTime) / durationMs);
-      audio.volume = startVolume + (targetVolume - startVolume) * progress;
-
-      if (progress < 1) {
-        audioState.fadeFrameId = window.requestAnimationFrame(step);
-        return;
-      }
-
-      audioState.fadeFrameId = null;
-      resolve();
-    }
-
-    audioState.fadeFrameId = window.requestAnimationFrame(step);
-  });
-}
-
-async function toggleBookTrack() {
-  await initializeAudio();
-
-  if (!audioState.music || audioState.availability.bookTrack === "missing") {
-    setTrackButtonState("error");
-    return;
-  }
-
-  if (audioState.music.paused) {
-    setTrackButtonState("loading");
-    await tryStartAmbientAudio();
-    requestAudioLoad(audioState.music, "bookTrack", "auto");
-    audioState.music.volume = 0;
-
-    try {
-      await audioState.music.play();
-    } catch {
-      setTrackButtonState("error");
-      updateTrackButton(false);
-      return;
-    }
-
-    if (!analyticsState.musicPlayingTracked) {
-      trackEvent("music_play");
-    }
-
-    analyticsState.musicPlayingTracked = true;
-    analyticsState.musicPauseTracked = false;
-    setTrackButtonState("playing");
-    updateTrackButton(true);
-    await fadeAudio(audioState.music, AUDIO_VOLUME.bookTrack, MUSIC_FADE_DURATION_MS);
-    return;
-  }
-
-  setTrackButtonState("pausing");
-  await fadeAudio(audioState.music, 0, MUSIC_FADE_DURATION_MS);
-  audioState.music.pause();
-
-  if (!analyticsState.musicPauseTracked) {
-    trackEvent("music_pause");
-  }
-
-  analyticsState.musicPauseTracked = true;
-  analyticsState.musicPlayingTracked = false;
-  setTrackButtonState("paused");
-  updateTrackButton(false);
 }
 
 function playDogHeadAnimation() {
@@ -890,52 +1288,48 @@ function playDogHeadAnimation() {
   dogHeadElement.classList.add(DOG_HEAD_ANIMATION_CLASS);
 
   return new Promise((resolve) => {
-    let completed = false;
-    const handleAnimationEnd = () => {
-      if (completed) {
-        return;
-      }
+    let timeoutId = null;
 
-      completed = true;
+    const finish = () => {
+      window.clearTimeout(timeoutId);
+      dogHeadElement.removeEventListener("animationend", handleAnimationEnd);
       dogHeadElement.classList.remove(DOG_HEAD_ANIMATION_CLASS);
       isDogAnimating = false;
       resolve();
     };
 
-    dogHeadElement.addEventListener("animationend", handleAnimationEnd, {
-      once: true
-    });
+    const handleAnimationEnd = (event) => {
+      if (event.target === dogHeadElement && event.animationName === "dogHeadHowl") {
+        finish();
+      }
+    };
 
-    window.setTimeout(
-      handleAnimationEnd,
-      prefersReducedMotion.matches
-        ? DOG_HEAD_ANIMATION_REDUCED_DURATION_MS + 120
-        : DOG_HEAD_ANIMATION_DURATION_MS + 120
+    dogHeadElement.addEventListener("animationend", handleAnimationEnd);
+    timeoutId = window.setTimeout(
+      finish,
+      (reduceMotion ? DOG_HEAD_ANIMATION_REDUCED_DURATION_MS : DOG_HEAD_ANIMATION_DURATION_MS) + 120
     );
   });
 }
 
 async function playDogHowl() {
-  const howlAudio = audioState.effects.dogHowl;
+  const howl = audioState.dogHowl;
 
-  if (
-    document.hidden ||
-    audioState.isHowlPlaying ||
-    !howlAudio ||
-    audioState.availability.dogHowl === "missing"
-  ) {
+  if (document.hidden || audioState.isHowlPlaying || !howl || audioState.missing.has("dogHowl")) {
     return false;
   }
 
   try {
     audioState.isHowlPlaying = true;
-    requestAudioLoad(howlAudio, "dogHowl", "auto");
-    howlAudio.currentTime = 0;
-    await howlAudio.play();
-    howlAudio.onended = () => {
-      audioState.isHowlPlaying = false;
-      howlAudio.onended = null;
-    };
+    howl.currentTime = 0;
+    await howl.play();
+    howl.addEventListener(
+      "ended",
+      () => {
+        audioState.isHowlPlaying = false;
+      },
+      { once: true }
+    );
     return true;
   } catch {
     audioState.isHowlPlaying = false;
@@ -943,105 +1337,215 @@ async function playDogHowl() {
   }
 }
 
-async function playDogMinuteEvent(minutes) {
-  if (
-    document.hidden ||
-    minutes < 1 ||
-    minutes > 9 ||
-    howledMinutes.has(minutes)
-  ) {
-    return false;
-  }
+/* ------------------------------------------------------------------ */
+/* Таймер 9:59 и финал                                                  */
+/* ------------------------------------------------------------------ */
 
+const howledMinutes = new Set();
+let countdownEndTime = 0;
+let timerIntervalId = null;
+let finaleShown = false;
+
+function formatTime(totalSeconds) {
+  const safeSeconds = Math.max(0, totalSeconds);
+  const minutes = Math.floor(safeSeconds / 60);
+  const seconds = safeSeconds % 60;
+
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
+function getRemainingSeconds() {
+  return Math.ceil(Math.max(0, countdownEndTime - Date.now()) / 1000);
+}
+
+async function playDogMinuteEvent(minutes) {
   if (!isDogAnimating) {
     window.setTimeout(() => {
       void playDogHeadAnimation();
-    }, prefersReducedMotion.matches ? 0 : 180);
+    }, reduceMotion ? 0 : 180);
   }
 
-  const didPlay = await playDogHowl();
-
-  if (didPlay) {
+  if (await playDogHowl()) {
     howledMinutes.add(minutes);
   }
-
-  return didPlay;
 }
 
-function checkMinuteDogEvent(minutes, seconds, options = {}) {
-  const { allowDogEvent = true } = options;
-
-  if (!allowDogEvent || document.hidden || seconds !== 0 || minutes < 1 || minutes > 9) {
-    return;
-  }
-
-  // Retry within the same minute boundary if the previous play() call was blocked.
-  if (howledMinutes.has(minutes) || audioState.isHowlPlaying) {
+function checkMinuteDogEvent(minutes, seconds, allowDogEvent) {
+  if (
+    !allowDogEvent ||
+    document.hidden ||
+    seconds !== 0 ||
+    minutes < 1 ||
+    minutes > 9 ||
+    howledMinutes.has(minutes) ||
+    audioState.isHowlPlaying
+  ) {
     return;
   }
 
   void playDogMinuteEvent(minutes);
 }
 
-function updateTimer(options = {}) {
-  const { allowDogEvent = true } = options;
+function showFinale() {
+  if (finaleShown || !heroElement || !finaleElement) {
+    return;
+  }
 
+  finaleShown = true;
+  finaleElement.hidden = false;
+  heroElement.classList.add("hero--finale");
+  trackEvent("timer_finished");
+}
+
+function hideFinale() {
+  finaleShown = false;
+
+  if (finaleElement) {
+    finaleElement.hidden = true;
+  }
+
+  heroElement?.classList.remove("hero--finale");
+}
+
+function updateTimer({ allowDogEvent = true } = {}) {
   if (!timerElement) {
     return;
   }
 
-  const remainingSeconds = getRemainingSeconds(countdownEndTime);
+  const remainingSeconds = getRemainingSeconds();
   const minutes = Math.floor(remainingSeconds / 60);
   const seconds = remainingSeconds % 60;
 
   timerElement.textContent = formatTime(remainingSeconds);
-  checkMinuteDogEvent(minutes, seconds, { allowDogEvent });
+  checkMinuteDogEvent(minutes, seconds, allowDogEvent);
 
-  if (remainingSeconds === 0 && timerIntervalId !== null) {
-    window.clearInterval(timerIntervalId);
-    timerIntervalId = null;
+  if (remainingSeconds === 0) {
+    if (timerIntervalId !== null) {
+      window.clearInterval(timerIntervalId);
+      timerIntervalId = null;
+    }
+
+    showFinale();
   }
 }
 
-function startCountdown() {
+function startCountdown({ restart = false } = {}) {
   if (!timerElement) {
     return;
   }
 
-  countdownEndTime = Date.now() + TIMER_DURATION_MS;
-  resetDogMinuteEvents();
-  timerElement.textContent = "09:59";
+  // Время переживает перезагрузку страницы в рамках одной вкладки.
+  const storedEnd = Number(store.get("sessionStorage", TIMER_STORAGE_KEY));
+  const hasRunningTimer = !restart && Number.isFinite(storedEnd) && storedEnd > Date.now();
+
+  countdownEndTime = hasRunningTimer ? storedEnd : Date.now() + TIMER_DURATION_MS;
+  store.set("sessionStorage", TIMER_STORAGE_KEY, countdownEndTime);
+
+  howledMinutes.clear();
+  hideFinale();
+
+  if (timerIntervalId !== null) {
+    window.clearInterval(timerIntervalId);
+  }
+
   updateTimer({ allowDogEvent: false });
-  timerIntervalId = window.setInterval(() => {
-    updateTimer({ allowDogEvent: true });
-  }, TIMER_TICK_MS);
+  timerIntervalId = window.setInterval(() => updateTimer(), TIMER_TICK_MS);
+}
+
+/* ------------------------------------------------------------------ */
+/* Видимость вкладки, видимость hero, настройки движения                */
+/* ------------------------------------------------------------------ */
+
+function initializeHeroVisibility() {
+  if (!heroElement || !("IntersectionObserver" in window)) {
+    return;
+  }
+
+  const observer = new IntersectionObserver(([entry]) => {
+    isHeroVisible = Boolean(entry?.isIntersecting);
+    // Пока hero не виден, CSS ставит все его анимации на паузу.
+    heroElement.classList.toggle("is-offscreen", !isHeroVisible);
+    scheduleNextSparkBurst();
+  });
+
+  observer.observe(heroElement);
 }
 
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) {
     cancelScheduledSparks();
 
-    if (audioState.effects.dogHowl && !audioState.effects.dogHowl.paused) {
-      audioState.effects.dogHowl.pause();
-      audioState.effects.dogHowl.currentTime = 0;
+    if (audioState.dogHowl && !audioState.dogHowl.paused) {
+      audioState.dogHowl.pause();
+      audioState.dogHowl.currentTime = 0;
     }
 
     audioState.isHowlPlaying = false;
+
+    // Тиканье часов в фоне не нужно. Музыка продолжает играть: ею можно
+    // управлять с экрана блокировки через Media Session.
+    if (audioState.clock && !audioState.clock.paused) {
+      audioState.clock.pause();
+      audioState.ambientPausedByVisibility = true;
+    }
 
     return;
   }
 
   updateTimer({ allowDogEvent: false });
 
-  if (!audioState.ambientStarted) {
-    void tryStartAmbientAudio();
-  } else {
+  if (audioState.ambientPausedByVisibility) {
+    audioState.ambientPausedByVisibility = false;
+    void audioState.clock.play().catch(() => {});
+  } else if (!audioState.ambientStarted) {
     void startAmbientAudio();
   }
 
   scheduleNextSparkBurst();
 });
 
+motionQuery.addEventListener?.("change", (event) => {
+  reduceMotion = event.matches;
+
+  if (reduceMotion) {
+    cancelScheduledSparks();
+    revealAll();
+  } else {
+    scheduleNextSparkBurst();
+  }
+});
+
+/* ------------------------------------------------------------------ */
+/* PWA                                                                 */
+/* ------------------------------------------------------------------ */
+
+function registerServiceWorker() {
+  if (!("serviceWorker" in navigator) || !(window.isSecureContext || IS_LOCAL)) {
+    return;
+  }
+
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("sw.js").catch(() => {});
+  });
+}
+
+/* ------------------------------------------------------------------ */
+/* Старт                                                               */
+/* ------------------------------------------------------------------ */
+
+atmosphereButton?.addEventListener("click", toggleBookTrack);
+$("[data-timer-restart]")?.addEventListener("click", () => {
+  trackEvent("timer_restart");
+  startCountdown({ restart: true });
+  timerElement?.focus({ preventScroll: true });
+});
+
+initializeConsent();
+initializeRevealAnimations();
+initializeAuthorAnalytics();
+initializeReader();
+initializeHeroVisibility();
 initializeFireAnimation();
-void initializeAudio();
+initializeAudio();
 startCountdown();
+registerServiceWorker();

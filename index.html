@@ -1,15 +1,30 @@
 <!DOCTYPE html>
 <html lang="ru">
   <head>
-    <!-- Google tag (gtag.js) -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-35T767LSGK"></script>
     <script>
+      document.documentElement.classList.add("js");
+
+      // Google Consent Mode v2: аналитика по умолчанию без cookies,
+      // пока посетитель не нажмёт «Разрешить» в баннере.
       window.dataLayer = window.dataLayer || [];
       function gtag(){dataLayer.push(arguments);}
-      gtag("js", new Date());
 
+      var storedConsent = null;
+      try {
+        storedConsent = window.localStorage.getItem("analytics-consent");
+      } catch (error) {}
+
+      gtag("consent", "default", {
+        analytics_storage: storedConsent === "granted" ? "granted" : "denied",
+        ad_storage: "denied",
+        ad_user_data: "denied",
+        ad_personalization: "denied"
+      });
+      gtag("js", new Date());
       gtag("config", "G-35T767LSGK");
     </script>
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-35T767LSGK"></script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>«Мечта. 9:59» — роман Тимофея Бородича</title>
@@ -32,6 +47,7 @@
       sizes="180x180"
       href="assets/images/apple-touch-icon-180.png"
     />
+    <link rel="manifest" href="manifest.webmanifest" />
 
     <!-- Open Graph -->
     <meta property="og:type" content="book" />
@@ -86,6 +102,7 @@
             "description": "«Мечта. 9:59» — роман Тимофея Бородича о выборе, страхе, любви, свободе и ценности времени.",
             "inLanguage": "ru",
             "url": "https://9-59.site/",
+            "isAccessibleForFree": true,
             "image": "https://9-59.site/assets/images/book-cover-current.jpg",
             "author": {
               "@id": "https://9-59.site/#author"
@@ -196,12 +213,31 @@
           id="hero-timer"
           role="timer"
           aria-label="Обратный таймер"
+          tabindex="-1"
         >
           09:59
         </p>
         <p class="hero__tagline hero__tagline--countdown" id="hero-tagline">
           СВОБОДА ЧЕРЕЗ ПРИНЯТИЕ
         </p>
+      </div>
+
+      <div class="hero__finale" data-timer-finale hidden>
+        <p class="hero__finale-quote">
+          Иногда, чтобы найти свободу, нужно перестать бороться.
+        </p>
+        <div class="hero__finale-actions">
+          <button class="hero__finale-button" type="button" data-open-reader>
+            Читать фрагмент
+          </button>
+          <button
+            class="hero__finale-button hero__finale-button--ghost"
+            type="button"
+            data-timer-restart
+          >
+            Ещё 9:59
+          </button>
+        </div>
       </div>
     </header>
 
@@ -215,6 +251,7 @@
           <div class="about-panel__book book-mockup">
             <img
               src="assets/images/book-mockup.webp"
+              data-reader-origin
               alt="Книга «Мечта. 9:59» Тимофея Бородича"
               width="660"
               height="930"
@@ -233,14 +270,15 @@
               «Мечта. 9:59» — это путь внутрь себя. Туда, где заканчивается
               страх и начинается свобода.
             </p>
-            <a
+            <button
               class="about-panel__link"
-              href="assets/content/fragment.json"
+              type="button"
               data-open-reader
+              aria-haspopup="dialog"
               aria-label="Прочитать фрагмент романа «Мечта. 9:59»"
             >
               Читать фрагмент
-            </a>
+            </button>
           </section>
 
           <section
@@ -352,37 +390,56 @@
                 любви.
               </p>
             </div>
-
-            <div class="author-section__socials" hidden data-author-socials></div>
           </div>
+        </div>
+      </section>
+
+      <section class="next-book" id="next-book" aria-labelledby="next-book-title">
+        <div class="next-book__inner">
+          <p class="next-book__kicker" data-reveal="label">СКОРО</p>
+          <h2 class="next-book__title" id="next-book-title" data-reveal="title">
+            «Пока автобус едет»
+          </h2>
+          <p class="next-book__text" data-reveal="body">
+            Новый роман Тимофея Бородича. Следите за новостями автора, чтобы
+            не пропустить выход.
+          </p>
+          <a
+            class="next-book__link"
+            href="https://taplink.cc/dream959"
+            target="_blank"
+            rel="noreferrer noopener"
+            data-reveal="body"
+            data-analytics-contact-type="next_book"
+          >
+            Узнать о выходе первым
+          </a>
         </div>
       </section>
     </main>
 
-    <footer class="site-footer" aria-labelledby="site-footer-title">
+    <footer class="site-footer">
       <div class="site-footer__inner">
         <div class="site-footer__top">
-          <section class="site-footer__column site-footer__column--meta" aria-labelledby="site-footer-title">
-            <h2 class="site-footer__title" id="site-footer-title">© 2026 Тимофей Бородич</h2>
+          <div class="site-footer__column site-footer__column--meta">
+            <p class="site-footer__title">© 2026 Тимофей Бородич</p>
             <p class="site-footer__line">Роман «Мечта. 9:59»</p>
             <p class="site-footer__line">Все права защищены.</p>
-          </section>
+          </div>
 
-          <section class="site-footer__column site-footer__column--contacts" aria-labelledby="footer-contacts-title">
-            <h2 class="site-footer__title site-footer__title--contacts" id="footer-contacts-title">
+          <div class="site-footer__column site-footer__column--contacts">
+            <p class="site-footer__title site-footer__title--contacts">
               <a
                 class="site-footer__contact-heading-link"
                 href="https://taplink.cc/dream959"
                 target="_blank"
                 rel="noreferrer noopener"
                 data-analytics-contact-type="website"
-                aria-label="Связаться с автором"
               >
                 Связаться с автором
               </a>
-            </h2>
-            <ul class="site-footer__contacts" aria-label="Контакты автора"></ul>
-          </section>
+            </p>
+          </div>
         </div>
 
         <p class="site-footer__copyright">
@@ -400,16 +457,9 @@
       </div>
     </footer>
 
-    <div class="reader-layer" aria-hidden="true">
+    <dialog class="reader-layer" aria-labelledby="reader-title">
       <div class="reader-layer__backdrop" data-close-reader></div>
-      <section
-        class="reader-dialog"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="reader-title"
-        aria-describedby="reader-content"
-        tabindex="-1"
-      >
+      <section class="reader-dialog">
         <button
           class="reader-dialog__close"
           type="button"
@@ -424,13 +474,48 @@
             <p class="reader-dialog__label">ФРАГМЕНТ</p>
             <h2 class="reader-dialog__title" id="reader-title">МЕЧТА. 9:59</h2>
             <div class="reader-dialog__rule" aria-hidden="true"></div>
+            <div class="reader-dialog__tools" role="group" aria-label="Размер текста">
+              <button
+                class="reader-dialog__tool"
+                type="button"
+                data-reader-font="-1"
+                aria-label="Уменьшить текст"
+              >
+                A−
+              </button>
+              <button
+                class="reader-dialog__tool"
+                type="button"
+                data-reader-font="1"
+                aria-label="Увеличить текст"
+              >
+                A+
+              </button>
+            </div>
           </header>
 
           <div class="reader-dialog__body">
-            <article class="reader-dialog__page" id="reader-content"></article>
+            <article
+              class="reader-dialog__page"
+              id="reader-content"
+              tabindex="0"
+              aria-label="Текст фрагмента"
+            ></article>
           </div>
 
+          <button
+            class="reader-dialog__share"
+            type="button"
+            data-reader-share
+            hidden
+          >
+            Поделиться цитатой
+          </button>
+
           <footer class="reader-dialog__footer">
+            <div class="reader-dialog__progress" aria-hidden="true">
+              <span data-reader-progress></span>
+            </div>
             <button
               class="reader-dialog__nav reader-dialog__nav--prev"
               type="button"
@@ -449,8 +534,27 @@
           </footer>
         </div>
       </section>
+    </dialog>
+
+    <div class="toast" role="status" aria-live="polite" popover="manual" data-toast></div>
+
+    <div class="consent" role="region" aria-label="Согласие на аналитику" data-consent hidden>
+      <p class="consent__text">
+        Сайт использует Google Analytics, чтобы понимать, сколько людей читают и
+        скачивают книгу. Можно отказаться — всё будет работать так же.
+      </p>
+      <div class="consent__actions">
+        <button class="consent__button" type="button" data-consent-accept>Разрешить</button>
+        <button
+          class="consent__button consent__button--ghost"
+          type="button"
+          data-consent-decline
+        >
+          Отказаться
+        </button>
+      </div>
     </div>
 
-    <script src="script.js"></script>
+    <script type="module" src="script.js"></script>
   </body>
 </html>
