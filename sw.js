@@ -2,7 +2,7 @@
 // Даёт офлайн-доступ к странице и фрагменту книги.
 // После изменения списка файлов или стратегии увеличьте VERSION.
 
-const VERSION = "v4";
+const VERSION = "v5";
 const SHELL_CACHE = `mechta-shell-${VERSION}`;
 const RUNTIME_CACHE = `mechta-runtime-${VERSION}`;
 
@@ -11,6 +11,7 @@ const SHELL_URLS = [
   "./index.html",
   "./styles.css",
   "./script.js",
+  "./fire.js",
   "./manifest.webmanifest",
   "./assets/content/fragment.json",
   "./assets/images/hero-room-v1.webp",
